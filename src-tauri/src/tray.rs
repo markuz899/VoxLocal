@@ -1,24 +1,18 @@
 //! Icona e menu nella barra di sistema.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
+use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder, Wry};
 
+use crate::llm::registry::{self, ProviderKind};
 use crate::models;
 use crate::pipeline::{Pipeline, State};
-use crate::settings::{self, HotkeyMode};
+use crate::settings::{self, HotkeyMode, Settings};
 
 const TRAY_ID: &str = "main";
-
-struct Items {
-    status: MenuItem<Wry>,
-    ptt: CheckMenuItem<Wry>,
-    toggle: CheckMenuItem<Wry>,
-    models: Vec<CheckMenuItem<Wry>>,
-    langs: Vec<CheckMenuItem<Wry>>,
-}
 
 // ponytail: lista fissa; la scelta libera fra le ~99 lingue di whisper arriva con le impostazioni (Fase 4)
 const LANGS: &[(&str, &str)] = &[
@@ -30,86 +24,147 @@ const LANGS: &[(&str, &str)] = &[
     ("de", "Deutsch"),
 ];
 
+/// Gruppi di voci a scelta singola, indicizzati per prefisso dell'id ("lang", "mode", …).
+type Radios = HashMap<&'static str, Vec<(String, CheckMenuItem<Wry>)>>;
+
+struct Items {
+    status: MenuItem<Wry>,
+    radios: Radios,
+}
+
+fn radio(
+    app: &AppHandle,
+    radios: &mut Radios,
+    group: &'static str,
+    title: &str,
+    options: Vec<(String, String)>,
+    selected: &str,
+) -> tauri::Result<Submenu<Wry>> {
+    let items = options
+        .into_iter()
+        .map(|(value, label)| {
+            let item = CheckMenuItem::with_id(
+                app,
+                format!("{group}:{value}"),
+                label,
+                true,
+                value == selected,
+                None::<&str>,
+            )?;
+            Ok((value, item))
+        })
+        .collect::<tauri::Result<Vec<_>>>()?;
+    let refs: Vec<&dyn IsMenuItem<Wry>> = items.iter().map(|(_, i)| i as _).collect();
+    let sub = Submenu::with_items(app, title, true, &refs)?;
+    radios.insert(group, items);
+    Ok(sub)
+}
+
+fn pairs(v: &[(&str, &str)]) -> Vec<(String, String)> {
+    v.iter()
+        .map(|(a, b)| (a.to_string(), b.to_string()))
+        .collect()
+}
+
 pub fn build(app: &AppHandle, pipeline: &Arc<Pipeline>) -> tauri::Result<()> {
     let s = pipeline.settings();
-    let status = MenuItem::with_id(app, "status", "Pronto", false, None::<&str>)?;
-    let ptt = CheckMenuItem::with_id(
-        app,
-        "mode:ptt",
-        "Tieni premuto per parlare",
-        true,
-        s.hotkey_mode == HotkeyMode::Ptt,
-        None::<&str>,
-    )?;
-    let toggle = CheckMenuItem::with_id(
-        app,
-        "mode:toggle",
-        "Premi per avviare/fermare",
-        true,
-        s.hotkey_mode == HotkeyMode::Toggle,
-        None::<&str>,
-    )?;
-    let model_items = models::MODELS
-        .iter()
-        .map(|m| {
-            CheckMenuItem::with_id(
-                app,
-                format!("model:{}", m.id),
-                m.label,
-                true,
-                m.id == s.local_model,
-                None::<&str>,
-            )
-        })
-        .collect::<tauri::Result<Vec<_>>>()?;
-    let model_refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> =
-        model_items.iter().map(|i| i as _).collect();
-    let model_menu = Submenu::with_items(app, "Modello whisper", true, &model_refs)?;
-    let lang_items = LANGS
-        .iter()
-        .map(|(code, label)| {
-            CheckMenuItem::with_id(
-                app,
-                format!("lang:{code}"),
-                *label,
-                true,
-                *code == s.language,
-                None::<&str>,
-            )
-        })
-        .collect::<tauri::Result<Vec<_>>>()?;
-    let lang_refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> =
-        lang_items.iter().map(|i| i as _).collect();
-    let lang_menu = Submenu::with_items(app, "Lingua", true, &lang_refs)?;
+    let mut radios = Radios::new();
 
+    let modes = pipeline.storage.modes().unwrap_or_default();
+    let mode_menu = radio(
+        app,
+        &mut radios,
+        "mode",
+        "Modalità",
+        modes
+            .iter()
+            .map(|m| (m.slug.clone(), m.name.clone()))
+            .collect(),
+        &s.active_mode,
+    )?;
+    let providers = registry::all(&s.providers);
+    let llm_menu = radio(
+        app,
+        &mut radios,
+        "llm",
+        "Provider LLM predefinito",
+        providers
+            .iter()
+            .filter(|p| p.kind != ProviderKind::None)
+            .map(|p| (p.id.clone(), p.label.clone()))
+            .collect(),
+        &s.default_llm,
+    )?;
+    let mut stt_options = vec![("local".to_string(), "Whisper locale".to_string())];
+    stt_options.extend(
+        providers
+            .iter()
+            .filter(|p| p.stt_model.is_some())
+            .map(|p| (p.id.clone(), format!("{} (cloud)", p.label))),
+    );
+    let stt_menu = radio(
+        app,
+        &mut radios,
+        "stt",
+        "Trascrizione",
+        stt_options,
+        &s.stt_provider,
+    )?;
+    let lang_menu = radio(
+        app,
+        &mut radios,
+        "lang",
+        "Lingua",
+        pairs(LANGS),
+        &s.language,
+    )?;
+    let model_menu = radio(
+        app,
+        &mut radios,
+        "model",
+        "Modello whisper",
+        models::MODELS
+            .iter()
+            .map(|m| (m.id.to_string(), m.label.to_string()))
+            .collect(),
+        &s.local_model,
+    )?;
+    let hk_menu = radio(
+        app,
+        &mut radios,
+        "hk",
+        &format!("Scorciatoia {}", s.hotkey),
+        pairs(&[
+            ("ptt", "Tieni premuto per parlare"),
+            ("toggle", "Premi per avviare/fermare"),
+        ]),
+        if s.hotkey_mode == HotkeyMode::Ptt {
+            "ptt"
+        } else {
+            "toggle"
+        },
+    )?;
+
+    let status = MenuItem::with_id(app, "status", "Pronto", false, None::<&str>)?;
     let menu = Menu::with_items(
         app,
         &[
             &status,
-            &MenuItem::with_id(
-                app,
-                "hotkey",
-                format!("Scorciatoia: {}", s.hotkey),
-                false,
-                None::<&str>,
-            )?,
             &PredefinedMenuItem::separator(app)?,
-            &ptt,
-            &toggle,
+            &mode_menu,
             &lang_menu,
-            &model_menu,
             &PredefinedMenuItem::separator(app)?,
+            &llm_menu,
+            &stt_menu,
+            &model_menu,
+            &hk_menu,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "repaste", "Copia l'ultimo dettato", true, None::<&str>)?,
             &MenuItem::with_id(app, "open", "Apri VoxLocal…", true, None::<&str>)?,
             &MenuItem::with_id(app, "quit", "Esci", true, None::<&str>)?,
         ],
     )?;
-    app.manage(Items {
-        status,
-        ptt,
-        toggle,
-        models: model_items,
-        langs: lang_items,
-    });
+    app.manage(Items { status, radios });
 
     TrayIconBuilder::with_id(TRAY_ID)
         .icon(tauri::include_image!("icons/tray.png"))
@@ -124,42 +179,52 @@ pub fn build(app: &AppHandle, pipeline: &Arc<Pipeline>) -> tauri::Result<()> {
 
 fn on_menu(app: &AppHandle, id: &str) {
     let pipeline = app.state::<Arc<Pipeline>>().inner().clone();
-    let items = app.state::<Items>();
     match id {
-        "quit" => app.exit(0),
-        "open" => open_main(app),
-        "mode:ptt" | "mode:toggle" => {
-            let mode = if id == "mode:ptt" {
+        "quit" => return app.exit(0),
+        "open" => return open_main(app),
+        "repaste" => {
+            if let Ok(Some(text)) = pipeline.storage.last_dictation() {
+                let _ = crate::paste::set_clipboard(&text);
+                set_status(app, "Ultimo dettato copiato negli appunti");
+            }
+            return;
+        }
+        _ => {}
+    }
+    let Some((group, value)) = id.split_once(':') else {
+        return;
+    };
+    if let Some(list) = app.state::<Items>().radios.get(group) {
+        for (v, item) in list {
+            let _ = item.set_checked(v == value);
+        }
+    }
+    let value = value.to_string();
+    match group {
+        "mode" => update(app, &pipeline, |s| s.active_mode = value),
+        "llm" => update(app, &pipeline, |s| s.default_llm = value),
+        "stt" => update(app, &pipeline, |s| s.stt_provider = value),
+        "lang" => update(app, &pipeline, |s| s.language = value),
+        "hk" => update(app, &pipeline, |s| {
+            s.hotkey_mode = if value == "ptt" {
                 HotkeyMode::Ptt
             } else {
                 HotkeyMode::Toggle
-            };
-            let _ = items.ptt.set_checked(mode == HotkeyMode::Ptt);
-            let _ = items.toggle.set_checked(mode == HotkeyMode::Toggle);
-            update(app, &pipeline, |s| s.hotkey_mode = mode);
-        }
-        _ if id.starts_with("lang:") => {
-            let code = &id["lang:".len()..];
-            for (item, (c, _)) in items.langs.iter().zip(LANGS) {
-                let _ = item.set_checked(*c == code);
             }
-            update(app, &pipeline, |s| s.language = code.into());
-        }
-        _ => {
-            let Some(info) = id.strip_prefix("model:").and_then(models::find) else {
+        }),
+        "model" => {
+            let Some(info) = models::find(&value) else {
                 return;
             };
-            for (item, m) in items.models.iter().zip(models::MODELS) {
-                let _ = item.set_checked(m.id == info.id);
-            }
-            update(app, &pipeline, |s| s.local_model = info.id.into());
+            update(app, &pipeline, |s| s.local_model = value);
             pipeline.stt.set_model(models::path(info));
             pipeline.ensure_model();
         }
+        _ => {}
     }
 }
 
-fn update(app: &AppHandle, pipeline: &Pipeline, f: impl FnOnce(&mut settings::Settings)) {
+fn update(app: &AppHandle, pipeline: &Pipeline, f: impl FnOnce(&mut Settings)) {
     let mut s = pipeline.settings.lock().unwrap();
     f(&mut s);
     settings::save(app, &s);
@@ -188,6 +253,7 @@ pub fn show_state(app: &AppHandle, state: State) {
         State::Idle => (None, "Pronto"),
         State::Recording => (Some("●"), "In ascolto…"),
         State::Transcribing => (Some("…"), "Trascrivo…"),
+        State::PostProcessing => (Some("✎"), "Elaboro con l'LLM…"),
         State::Pasting => (Some("…"), "Incollo…"),
     };
     if let Some(tray) = app.tray_by_id(TRAY_ID) {

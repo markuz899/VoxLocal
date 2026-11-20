@@ -1,8 +1,11 @@
 pub mod audio;
+pub mod cli;
+pub mod llm;
 pub mod models;
 pub mod paste;
 pub mod pipeline;
 pub mod settings;
+pub mod storage;
 pub mod stt;
 mod tray;
 
@@ -13,6 +16,19 @@ use tauri::{Manager, RunEvent};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, ShortcutState};
 
 use pipeline::Pipeline;
+
+pub const IDENTIFIER: &str = "app.voxlocal.desktop";
+
+/// Stessa cartella di `app_data_dir()` di Tauri: così bench e sottocomandi la condividono con l'app.
+pub fn data_dir() -> std::path::PathBuf {
+    dirs::data_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join(IDENTIFIER)
+}
+
+pub fn db_path() -> std::path::PathBuf {
+    data_dir().join("voxlocal.db")
+}
 
 pub fn run() {
     let shortcuts = tauri_plugin_global_shortcut::Builder::new()
@@ -49,7 +65,13 @@ pub fn run() {
 
             let handle = app.handle().clone();
             let settings = settings::load(&handle);
-            let pipeline = Pipeline::new(handle.clone(), settings.clone());
+            let storage = Arc::new(storage::Storage::open(&db_path())?);
+            match storage.purge(settings.retention_days) {
+                Ok(n) if n > 0 => log::info!("cronologia: rimossi {n} dettati oltre la retention"),
+                Err(e) => log::error!("pulizia cronologia: {e:#}"),
+                _ => {}
+            }
+            let pipeline = Pipeline::new(handle.clone(), settings.clone(), storage);
             app.manage(pipeline.clone());
             tray::build(&handle, &pipeline)?;
 

@@ -7,7 +7,6 @@ use futures_util::StreamExt;
 use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-pub const IDENTIFIER: &str = "app.voxlocal.desktop";
 const BASE_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
 
 pub struct ModelInfo {
@@ -114,10 +113,7 @@ pub fn recommended() -> &'static str {
 
 /// Stessa cartella di `app_data_dir()` di Tauri, così bench e app condividono i modelli.
 pub fn models_dir() -> PathBuf {
-    dirs::data_dir()
-        .unwrap_or_else(std::env::temp_dir)
-        .join(IDENTIFIER)
-        .join("models")
+    crate::data_dir().join("models")
 }
 
 pub fn path(m: &ModelInfo) -> PathBuf {

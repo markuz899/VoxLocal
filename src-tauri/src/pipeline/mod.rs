@@ -4,15 +4,18 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 use tokio_util::sync::CancellationToken;
 
-use crate::audio::{self, Recorder};
-use crate::settings::{HotkeyMode, Settings};
-use crate::stt::{LocalWhisper, SttOptions, SttProvider};
+use crate::audio::{self, AudioBuffer, Recorder};
+use crate::llm::registry::{self, ProviderKind, NONE_ID};
+use crate::llm::{self, LlmError, LlmRequest};
+use crate::settings::{secrets, HotkeyMode, Settings};
+use crate::storage::{Dictation, Mode, Storage};
+use crate::stt::{LocalWhisper, OpenAiCompatibleStt, SttOptions, SttProvider, Transcript};
 use crate::{models, paste, tray};
 
 /// Sotto questa durata è un tocco involontario della hotkey.
@@ -20,6 +23,7 @@ const MIN_AUDIO_MS: u64 = 300;
 /// RMS sotto ~-54 dBFS: silenzio, inutile mandarlo a whisper (che allucina sul silenzio).
 const SILENCE_RMS: f32 = 0.002;
 pub const ESC: &str = "Escape";
+const LOCAL_STT: &str = "local";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -27,6 +31,7 @@ pub enum State {
     Idle,
     Recording,
     Transcribing,
+    PostProcessing,
     Pasting,
 }
 
@@ -39,6 +44,7 @@ pub struct Pipeline {
     app: AppHandle,
     pub stt: LocalWhisper,
     pub settings: Mutex<Settings>,
+    pub storage: Arc<Storage>,
     inner: Mutex<Inner>,
     downloading: AtomicBool,
 }
@@ -51,12 +57,13 @@ struct Inner {
 }
 
 impl Pipeline {
-    pub fn new(app: AppHandle, settings: Settings) -> Arc<Self> {
+    pub fn new(app: AppHandle, settings: Settings, storage: Arc<Storage>) -> Arc<Self> {
         let model = models::find(&settings.local_model).unwrap_or(&models::MODELS[2]);
         Arc::new(Self {
             stt: LocalWhisper::new(models::path(model), settings.keep_warm()),
             app,
             settings: Mutex::new(settings),
+            storage,
             inner: Mutex::new(Inner {
                 state: State::Idle,
                 recorder: None,
@@ -98,22 +105,29 @@ impl Pipeline {
     }
 
     fn start(self: &Arc<Self>) {
-        let model = self.settings.lock().unwrap().local_model.clone();
+        let (model, stt_provider) = {
+            let s = self.settings.lock().unwrap();
+            (s.local_model.clone(), s.stt_provider.clone())
+        };
         let Some(info) = models::find(&model) else {
             return self.notify(&format!("Modello sconosciuto: {model}"));
         };
-        if !models::is_installed(info) {
+        let installed = models::is_installed(info);
+        // Con lo STT remoto il modello locale serve solo come ripiego: non blocca il dettato.
+        if stt_provider == LOCAL_STT && !installed {
             self.notify("Il modello di trascrizione non è ancora scaricato: lo scarico ora.");
             return self.ensure_model();
         }
 
         // Precarica il modello mentre l'utente parla: toglie il caricamento dalla latenza.
-        let stt = self.stt.clone();
-        tauri::async_runtime::spawn_blocking(move || {
-            if let Err(e) = stt.preload() {
-                log::error!("{e:#}");
-            }
-        });
+        if stt_provider == LOCAL_STT {
+            let stt = self.stt.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                if let Err(e) = stt.preload() {
+                    log::error!("{e:#}");
+                }
+            });
+        }
 
         let app = self.app.clone();
         let rec = match Recorder::start(move |level| {
@@ -186,32 +200,101 @@ impl Pipeline {
         let resample_ms = t.elapsed().as_millis();
 
         let settings = self.settings();
+        let vocabulary = self.storage.vocabulary().unwrap_or_default();
         let opts = SttOptions {
             language: settings.language(),
-            initial_prompt: None,
+            initial_prompt: (!vocabulary.is_empty()).then(|| vocabulary.join(", ")),
             cancel: cancel.clone(),
         };
         let t = Instant::now();
-        let transcript = self.stt.transcribe(&audio, &opts).await?;
-        let stt_ms = t.elapsed().as_millis();
+        let (transcript, stt_id) = self.transcribe(&audio, &opts, &settings).await?;
+        let stt_ms = t.elapsed().as_millis() as u64;
         if cancel.is_cancelled() || transcript.text.is_empty() {
+            return Ok(());
+        }
+
+        let mut d = Dictation {
+            language: transcript.language.clone(),
+            raw_text: transcript.text.clone(),
+            final_text: transcript.text.clone(),
+            stt_model: (stt_id == "local").then(|| settings.local_model.clone()),
+            stt_provider: stt_id,
+            status: "ok",
+            audio_ms,
+            stt_ms: Some(stt_ms),
+            ..Default::default()
+        };
+
+        // Post-processing LLM: qualunque errore → si incolla il testo grezzo (mai perdere il dettato).
+        if let Some(mode) = self.storage.mode(&settings.active_mode).ok().flatten() {
+            d.mode_id = Some(mode.id);
+            let provider = mode
+                .provider_id
+                .clone()
+                .unwrap_or_else(|| settings.default_llm.clone());
+            if provider != NONE_ID {
+                self.set_state(State::PostProcessing);
+                let language = transcript
+                    .language
+                    .clone()
+                    .unwrap_or_else(|| "rilevata automaticamente".into());
+                let t = Instant::now();
+                let res = self
+                    .post_process(
+                        &mode,
+                        &provider,
+                        &d.raw_text,
+                        &language,
+                        &vocabulary,
+                        &settings,
+                        cancel,
+                    )
+                    .await;
+                d.llm_ms = Some(t.elapsed().as_millis() as u64);
+                d.llm_provider = Some(provider.clone());
+                match res {
+                    Ok((text, model)) => {
+                        d.final_text = text;
+                        d.llm_model = Some(model);
+                    }
+                    Err(LlmError::Cancelled) => {}
+                    Err(e) => {
+                        log::warn!("LLM {provider} fallito, incollo il grezzo: {e}");
+                        d.status = "llm_fallback";
+                        d.error = Some(e.to_string());
+                        self.notify(&format!("{provider}: {e}. Incollo il testo non elaborato."));
+                    }
+                }
+            }
+        }
+        if cancel.is_cancelled() {
+            d.status = "cancelled";
+            self.save(&d);
             return Ok(());
         }
 
         self.set_state(State::Pasting);
         let t = Instant::now();
-        let pasted = self.paste(transcript.text.clone(), &settings).await;
-        let paste_ms = t.elapsed().as_millis();
+        let pasted = self.paste(d.final_text.clone(), &settings).await;
+        d.paste_ms = Some(t.elapsed().as_millis() as u64);
+        d.total_ms = Some(released.elapsed().as_millis() as u64);
 
         log::info!(
-            "dettato ok: audio={audio_ms}ms resample={resample_ms}ms stt={stt_ms}ms paste={paste_ms}ms \
-             totale={}ms lingua={:?} caratteri={}",
-            released.elapsed().as_millis(),
-            transcript.language,
-            transcript.text.chars().count()
+            "dettato {}: audio={audio_ms}ms resample={resample_ms}ms stt={stt_ms}ms ({}) llm={:?}ms ({:?}) \
+             paste={:?}ms totale={:?}ms lingua={:?} caratteri={}",
+            d.status,
+            d.stt_provider,
+            d.llm_ms,
+            d.llm_provider,
+            d.paste_ms,
+            d.total_ms,
+            d.language,
+            d.final_text.chars().count()
         );
         if let Err(e) = pasted {
             log::warn!("incolla automatico non riuscito: {e:#}");
+            d.status = "paste_failed";
+            d.error = Some(format!("{e:#}"));
             let key = if cfg!(target_os = "macos") {
                 "⌘V"
             } else {
@@ -221,7 +304,94 @@ impl Pipeline {
                 "Testo copiato negli appunti: premi {key} per incollarlo."
             ));
         }
+        self.save(&d);
         Ok(())
+    }
+
+    fn save(&self, d: &Dictation) {
+        if let Err(e) = self.storage.insert_dictation(d) {
+            log::error!("salvataggio in cronologia fallito: {e:#}");
+        }
+    }
+
+    /// STT remoto se configurato, con ripiego su whisper locale se fallisce.
+    async fn transcribe(
+        &self,
+        audio: &AudioBuffer,
+        opts: &SttOptions,
+        s: &Settings,
+    ) -> Result<(Transcript, String)> {
+        if s.stt_provider != LOCAL_STT {
+            match self.remote_stt(s) {
+                Ok(remote) => match remote.transcribe(audio, opts).await {
+                    Ok(t) => return Ok((t, s.stt_provider.clone())),
+                    Err(e) if opts.cancel.is_cancelled() => return Err(e),
+                    Err(e) => log::warn!("STT remoto fallito, uso whisper locale: {e:#}"),
+                },
+                Err(e) => log::warn!("STT remoto non configurato, uso whisper locale: {e:#}"),
+            }
+        }
+        Ok((self.stt.transcribe(audio, opts).await?, LOCAL_STT.into()))
+    }
+
+    fn remote_stt(&self, s: &Settings) -> Result<OpenAiCompatibleStt> {
+        let cfg = registry::find(&s.stt_provider, &s.providers)
+            .ok_or_else(|| anyhow!("provider STT sconosciuto: {}", s.stt_provider))?;
+        let model = cfg
+            .stt_model
+            .clone()
+            .ok_or_else(|| anyhow!("{} non offre trascrizione", cfg.id))?;
+        let api_key = secrets::get(&cfg.id);
+        if cfg.needs_key && api_key.is_none() {
+            return Err(anyhow!("chiave API mancante per {}", cfg.id));
+        }
+        Ok(OpenAiCompatibleStt {
+            id: cfg.id,
+            base_url: cfg.base_url,
+            api_key,
+            model,
+            timeout: Duration::from_secs(30),
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn post_process(
+        &self,
+        mode: &Mode,
+        provider_id: &str,
+        text: &str,
+        language: &str,
+        vocabulary: &[String],
+        s: &Settings,
+        cancel: &CancellationToken,
+    ) -> std::result::Result<(String, String), LlmError> {
+        let cfg = registry::find(provider_id, &s.providers)
+            .ok_or_else(|| LlmError::Cli(format!("provider sconosciuto: {provider_id}")))?;
+        let Some(provider) = registry::build(&cfg)? else {
+            return Ok((text.to_string(), String::new()));
+        };
+        let model = mode
+            .model
+            .clone()
+            .filter(|m| !m.is_empty())
+            .unwrap_or_else(|| cfg.model.clone());
+        let timeout = if cfg.kind == ProviderKind::Cli {
+            s.cli_timeout_s
+        } else {
+            s.llm_timeout_s
+        };
+        let req = LlmRequest {
+            system: llm::render(&mode.system_prompt, text, language, vocabulary),
+            user: llm::render(&mode.user_template, text, language, vocabulary),
+            model: model.clone(),
+            temperature: Some(mode.temperature),
+            max_tokens: 2048,
+            timeout: Duration::from_secs(timeout),
+        };
+        tokio::select! {
+            r = provider.complete(&req) => r.map(|r| (r.text, model)),
+            _ = cancel.cancelled() => Err(LlmError::Cancelled),
+        }
     }
 
     async fn paste(&self, text: String, settings: &Settings) -> Result<()> {

@@ -113,6 +113,16 @@ L'anteprima della UI fuori da Tauri si fa con `mockIPC` di `@tauri-apps/api/mock
 
 Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log alla voce `totale=`. Va misurato con la prova manuale, perché da qui non posso premere la scorciatoia (vedi il report della Fase 2).
 
+## Cronologia, app e modalità per app
+
+- [ ] Detta in Mail e in Slack: nella cronologia ogni riga mostra la sua app. Su Windows il nome è quello dell'eseguibile.
+- [ ] Filtri: Oggi, Settimana e Tutto mostrano i conteggi; i filtri per modalità e per app restringono l'elenco.
+- [ ] Un dettato elaborato dall'AI: le parti cambiate sono sottolineate e il riquadro "Detto" mostra la frase originale.
+- [ ] Mentre detti, con la cronologia aperta, compare in cima la riga "In ascolto", poi "Trascrivo" e "Riscrivo"; a dettato finito la lista si aggiorna.
+- [ ] Modalità → Modalità per app: con la regola "Slack usa Messaggio", un dettato in Slack usa Messaggio anche se la modalità attiva è un'altra.
+- [ ] `pnpm test` (confronto fra testo detto e scritto) e `cargo test --lib` (filtri, conteggi, regole).
+- [ ] Rilevamento dell'app su un desktop vero: `cargo test --lib frontmost -- --ignored --nocapture`.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

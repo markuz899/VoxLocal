@@ -154,6 +154,21 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 ## D35 — Firma Apple condizionale nel workflow
 - Le credenziali Apple entrano nell'ambiente solo se il segreto `APPLE_CERTIFICATE` esiste: con variabili vuote il bundler di Tauri proverebbe a importare un certificato vuoto e fallirebbe. Senza segreti la build esce firmata ad-hoc, utile per beta private.
 
+## D36 — App di destinazione e modalità per app
+- `context::frontmost_app()` legge l'app in primo piano alla pressione della scorciatoia, prima di aprire il microfono:
+  - macOS: `NSWorkspace.frontmostApplication.localizedName` via objc2;
+  - Windows: `GetForegroundWindow` più il nome dell'eseguibile (`windows-sys`), compilato solo dalla CI;
+  - Linux: niente.
+- Il nome finisce nella colonna `target_app`; la migrazione 2 aggiunge anche `audio_device`.
+- `settings.app_modes`: la prima regola il cui nome è contenuto in quello dell'app (senza maiuscole) vince sulla modalità attiva. "Mail" vale anche per "Microsoft Outlook Mail".
+
+## D37 — "Cosa hai detto": confronto parola per parola nella UI
+- LCS sulle parole normalizzate (minuscole, senza punteggiatura), così la modalità Pulito non sottolinea tutto il testo. Oltre 250.000 celle non evidenzia nulla.
+- Sta nel frontend (`src/diff.ts`, test con `pnpm test`): il backend salva già testo detto e testo scritto.
+
+## D38 — Cronologia dal vivo
+- `pipeline://state` porta anche l'app di destinazione; ogni dettato salvato emette `history://changed`. La cronologia mostra in cima la riga del dettato in corso e si ricarica da sola.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

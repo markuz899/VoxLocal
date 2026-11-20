@@ -18,7 +18,10 @@ scorciatoia ─► microfono ─► 16 kHz ─► whisper.cpp ─► [LLM opzion
    - La trascrizione può anche passare da Groq o OpenAI. Se il servizio non risponde, si torna a quella locale.
 4. **Modalità (opzionale).** Il testo può passare da un LLM con un template di prompt: Pulito, Email, Messaggio, Elenco puntato, Traduci in EN, oppure modalità create da te. Il vocabolario personale (nomi, sigle) viene passato sia a whisper sia all'LLM. Se l'LLM sbaglia o va in timeout, viene incollato il testo grezzo: un dettato non si perde mai.
 5. **Incolla.** VoxLocal salva gli appunti, ci scrive il testo, simula ⌘V o Ctrl+V e poi rimette negli appunti quello che c'era prima. Se l'incolla automatico non riesce, il testo resta negli appunti e arriva una notifica.
-6. **Cronologia.** Ogni dettato finisce in SQLite locale, con testo grezzo e finale, tempi e stato, ricerca full-text e tempo di conservazione configurabile.
+6. **Cronologia.** Ogni dettato finisce in SQLite locale con l'app in cui è stato incollato, testo grezzo e finale, tempi di ogni fase e stato.
+   - La finestra Cronologia ha l'elenco filtrabile per periodo, modalità e app; a destra il dettaglio, dove le parti riscritte dall'AI sono sottolineate e mostrano cosa avevi detto.
+   - Il dettato in corso compare dal vivo in cima all'elenco.
+7. **Modalità per app.** Le regole del tipo "Slack usa Messaggio" o "Mail usa Email" scelgono la modalità in base all'app in primo piano quando parte il dettato.
 
 ### Provider LLM
 

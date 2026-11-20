@@ -124,13 +124,15 @@
   .hero--centred .hero__lead { color: var(--ink); }
 
   /* la frase sulla privacy: tre dati sotto, sulla linea sinistra */
-  #privacy .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-5); margin-top: var(--s-8); max-width: 960px; }
+  #privacy .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-5); margin-top: var(--s-8); }
   #privacy .facts dt { font-size: var(--t-stat); line-height: 1.1; letter-spacing: -0.02em; }
   #privacy .facts dd { margin: var(--s-2) 0 0; color: var(--ink); }
   @media (max-width: 639px) { #privacy .facts { grid-template-columns: 1fr; gap: var(--s-4); } }
 
   /* download: tre sistemi, il marchio reale in alto */
-  .os-card .os-mark { width: 40px; height: 40px; }
+  .os-card .panel { --p-h: 168px; display: grid; place-items: center; background: var(--g-alt); }
+  .os-card .os-mark { width: 88px; height: 88px; }
+  @media (max-width: 639px) { .os-card .panel { --p-h: 112px; } .os-card .os-mark { width: 56px; height: 56px; } }
   .os-card ul { margin: var(--s-4) 0 var(--s-6); padding: 0; list-style: none; display: grid; gap: var(--s-2); }
   .os-card .btn { width: 100%; }
   .os-card .os-alt { margin-top: var(--s-3); }
@@ -406,7 +408,7 @@
       </div>
       <div class="grid fill">
         <article class="card os-card span-4 m-nolift">
-          <img class="os-mark" data-icon="apple" src="assets/icons/apple.svg" alt="">
+          <div class="panel panel--top"><img class="os-mark" data-icon="apple" src="assets/icons/apple.svg" alt="Il marchio Apple"></div>
           <h3>macOS</h3>
           <ul>
             <li>macOS 11 o successivo</li>
@@ -416,7 +418,7 @@
           <a class="btn btn--secondary" href="downloads/VoxLocal-macOS.dmg" download>Scarica per Mac</a>
         </article>
         <article class="card os-card span-4 m-nolift">
-          <img class="os-mark" data-icon="windows" src="assets/icons/windows.svg" alt="">
+          <div class="panel panel--top"><img class="os-mark" data-icon="windows" src="assets/icons/windows.svg" alt="Il marchio Windows"></div>
           <h3>Windows</h3>
           <ul>
             <li>Windows 10 e 11 a 64 bit</li>
@@ -426,7 +428,7 @@
           <a class="btn btn--secondary" href="downloads/VoxLocal-Windows-setup.exe" download>Scarica per Windows</a>
         </article>
         <article class="card os-card span-4 m-nolift">
-          <img class="os-mark" data-icon="linux-tux" src="assets/icons/linux-tux.svg" alt="">
+          <div class="panel panel--top"><img class="os-mark" data-icon="linux-tux" src="assets/icons/linux-tux.svg" alt="Tux, la mascotte di Linux"></div>
           <h3>Linux</h3>
           <ul>
             <li>AppImage per ogni distribuzione</li>
@@ -450,7 +452,7 @@
           <a class="link" href="#domande">Leggi le domande sulle chiavi</a>
         </div>
         <div class="frame frame--split span-6 start-7">
-          <div class="dg" data-diagram><script type="application/json">{"layout": "hub", "alt": "VoxLocal si collega a OpenAI, Anthropic, Google Gemini, Groq, Mistral, DeepSeek e Ollama.", "center": {"label": "VoxLocal", "icon": "ui:mic"}, "spokes": [{"label": "OpenAI", "icon": "openai"}, {"label": "Anthropic", "icon": "anthropic"}, {"label": "Gemini", "icon": "gemini"}, {"label": "Groq", "icon": "groq"}, {"label": "Mistral", "icon": "mistral"}, {"label": "DeepSeek", "icon": "deepseek"}, {"label": "Ollama", "icon": "ollama"}]}</script></div>
+          <div class="dg" data-diagram data-dg-still><script type="application/json">{"layout": "hub", "alt": "VoxLocal si collega a OpenAI, Anthropic, Google Gemini, Groq, Mistral, DeepSeek e Ollama.", "center": {"label": "VoxLocal", "icon": "ui:mic"}, "spokes": [{"label": "OpenAI", "icon": "openai"}, {"label": "Anthropic", "icon": "anthropic"}, {"label": "Gemini", "icon": "gemini"}, {"label": "Groq", "icon": "groq"}, {"label": "Mistral", "icon": "mistral"}, {"label": "DeepSeek", "icon": "deepseek"}, {"label": "Ollama", "icon": "ollama"}]}</script></div>
         </div>
       </div>
     </div>

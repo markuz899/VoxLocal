@@ -1,0 +1,85 @@
+name: Release
+
+# Si avvia con un tag: git tag v0.2.0 && git push origin v0.2.0
+# Crea una release in bozza con installer e latest.json; si pubblica a mano dopo i test.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+          - platform: windows-latest
+            args: ""
+          - platform: ubuntu-22.04
+            args: ""
+    runs-on: ${{ matrix.platform }}
+    env:
+      HAS_APPLE_SIGNING: ${{ secrets.APPLE_CERTIFICATE != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # L'updater legge latest.json dalle release di questo stesso repository.
+      - name: Endpoint dell'updater
+        shell: bash
+        run: |
+          sed -i.bak "s#GITHUB_REPOSITORY#${GITHUB_REPOSITORY}#" src-tauri/tauri.conf.json
+          rm src-tauri/tauri.conf.json.bak
+          grep -q "${GITHUB_REPOSITORY}" src-tauri/tauri.conf.json
+
+      - name: Dipendenze Linux
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: >
+          sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev
+          libayatana-appindicator3-dev librsvg2-dev patchelf libasound2-dev libxdo-dev
+          libssl-dev cmake clang
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+      - run: pnpm install --frozen-lockfile
+
+      # Firma e notarizzazione Apple solo se i segreti esistono: senza, la build resta firmata
+      # ad-hoc (installabile, ma macOS mostra l'avviso "sviluppatore non identificato").
+      - name: Credenziali Apple
+        if: matrix.platform == 'macos-latest' && env.HAS_APPLE_SIGNING == 'true'
+        shell: bash
+        run: |
+          {
+            echo "APPLE_CERTIFICATE=${{ secrets.APPLE_CERTIFICATE }}"
+            echo "APPLE_CERTIFICATE_PASSWORD=${{ secrets.APPLE_CERTIFICATE_PASSWORD }}"
+            echo "APPLE_SIGNING_IDENTITY=${{ secrets.APPLE_SIGNING_IDENTITY }}"
+            echo "APPLE_ID=${{ secrets.APPLE_ID }}"
+            echo "APPLE_PASSWORD=${{ secrets.APPLE_PASSWORD }}"
+            echo "APPLE_TEAM_ID=${{ secrets.APPLE_TEAM_ID }}"
+          } >> "$GITHUB_ENV"
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: v__VERSION__
+          releaseName: VoxLocal __VERSION__
+          releaseBody: Vedi docs/INSTALL.md per l'installazione.
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}

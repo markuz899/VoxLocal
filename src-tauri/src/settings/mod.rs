@@ -37,7 +37,7 @@ impl Default for Settings {
             version: 1,
             hotkey: "Alt+Space".into(),
             hotkey_mode: HotkeyMode::Ptt,
-            language: "auto".into(),
+            language: system_language(),
             local_model: crate::models::recommended().into(),
             keep_warm_minutes: 10,
             restore_clipboard: true,
@@ -56,6 +56,15 @@ impl Settings {
     pub fn language(&self) -> Option<String> {
         (self.language != "auto").then(|| self.language.clone())
     }
+}
+
+/// Lingua del sistema se whisper la conosce, altrimenti "auto".
+/// Il rilevamento automatico su frasi di 2-3 s con `base` è inaffidabile (it scambiato per ru/pt/de).
+fn system_language() -> String {
+    sys_locale::get_locale()
+        .and_then(|l| l.split(['-', '_']).next().map(str::to_lowercase))
+        .filter(|code| whisper_rs::get_lang_id(code).is_some())
+        .unwrap_or_else(|| "auto".into())
 }
 
 pub fn load<R: Runtime>(app: &AppHandle<R>) -> Settings {

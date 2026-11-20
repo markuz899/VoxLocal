@@ -142,10 +142,10 @@ impl LocalWhisper {
 
         let text = state
             .as_iter()
-            .map(|s| s.to_str_lossy().map(|c| c.into_owned()).unwrap_or_default())
-            .collect::<String>()
-            .trim()
-            .to_string();
+            .filter_map(|s| s.to_str_lossy().ok().map(|c| c.trim().to_string()))
+            .filter(|t| !t.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
         let language =
             whisper_rs::get_lang_str(state.full_lang_id_from_state()).map(str::to_string);
 

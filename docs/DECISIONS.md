@@ -80,6 +80,11 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 ## D20 — `anyhow` al posto degli enum `thiserror` per modulo (per ora)
 - **Perché:** in Fase 2 nessun chiamante deve distinguere i tipi di errore, perché l'annullamento si legge dal token. Gli enum tipizzati arrivano con lo strato LLM, dove servono (timeout → fallback, 401 → chiave mancante).
 
+## D21 — Lingua di default = lingua del sistema, non "auto"
+- **Prova reale di Marco:** quattro dettati brevi (2-3 s) in italiano sono stati riconosciuti come de, pt, it e ru (p tra 0,22 e 0,63), con il testo tradotto o traslitterato.
+- **Con la lingua fissata:** testo corretto e STT 3 volte più veloce (niente passaggio di rilevamento della lingua).
+- **Come funziona ora:** `sys-locale` legge la lingua del sistema. Se whisper non la conosce, si ripiega su "auto". Dal tray si cambia al volo.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

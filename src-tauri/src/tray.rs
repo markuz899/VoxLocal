@@ -17,7 +17,18 @@ struct Items {
     ptt: CheckMenuItem<Wry>,
     toggle: CheckMenuItem<Wry>,
     models: Vec<CheckMenuItem<Wry>>,
+    langs: Vec<CheckMenuItem<Wry>>,
 }
+
+// ponytail: lista fissa; la scelta libera fra le ~99 lingue di whisper arriva con le impostazioni (Fase 4)
+const LANGS: &[(&str, &str)] = &[
+    ("auto", "Automatica"),
+    ("it", "Italiano"),
+    ("en", "English"),
+    ("es", "Español"),
+    ("fr", "Français"),
+    ("de", "Deutsch"),
+];
 
 pub fn build(app: &AppHandle, pipeline: &Arc<Pipeline>) -> tauri::Result<()> {
     let s = pipeline.settings();
@@ -54,6 +65,22 @@ pub fn build(app: &AppHandle, pipeline: &Arc<Pipeline>) -> tauri::Result<()> {
     let model_refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> =
         model_items.iter().map(|i| i as _).collect();
     let model_menu = Submenu::with_items(app, "Modello whisper", true, &model_refs)?;
+    let lang_items = LANGS
+        .iter()
+        .map(|(code, label)| {
+            CheckMenuItem::with_id(
+                app,
+                format!("lang:{code}"),
+                *label,
+                true,
+                *code == s.language,
+                None::<&str>,
+            )
+        })
+        .collect::<tauri::Result<Vec<_>>>()?;
+    let lang_refs: Vec<&dyn tauri::menu::IsMenuItem<Wry>> =
+        lang_items.iter().map(|i| i as _).collect();
+    let lang_menu = Submenu::with_items(app, "Lingua", true, &lang_refs)?;
 
     let menu = Menu::with_items(
         app,
@@ -69,6 +96,7 @@ pub fn build(app: &AppHandle, pipeline: &Arc<Pipeline>) -> tauri::Result<()> {
             &PredefinedMenuItem::separator(app)?,
             &ptt,
             &toggle,
+            &lang_menu,
             &model_menu,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "open", "Apri VoxLocal…", true, None::<&str>)?,
@@ -80,6 +108,7 @@ pub fn build(app: &AppHandle, pipeline: &Arc<Pipeline>) -> tauri::Result<()> {
         ptt,
         toggle,
         models: model_items,
+        langs: lang_items,
     });
 
     TrayIconBuilder::with_id(TRAY_ID)
@@ -108,6 +137,13 @@ fn on_menu(app: &AppHandle, id: &str) {
             let _ = items.ptt.set_checked(mode == HotkeyMode::Ptt);
             let _ = items.toggle.set_checked(mode == HotkeyMode::Toggle);
             update(app, &pipeline, |s| s.hotkey_mode = mode);
+        }
+        _ if id.starts_with("lang:") => {
+            let code = &id["lang:".len()..];
+            for (item, (c, _)) in items.langs.iter().zip(LANGS) {
+                let _ = item.set_checked(*c == code);
+            }
+            update(app, &pipeline, |s| s.language = code.into());
         }
         _ => {
             let Some(info) = id.strip_prefix("model:").and_then(models::find) else {

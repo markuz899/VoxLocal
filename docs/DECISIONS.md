@@ -142,6 +142,18 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Overlay:** TypeScript puro (0,7 KB di JS).
 - **Elemento distintivo:** il misuratore a barre, lo stesso nell'overlay, nella prova del microfono e nell'onboarding.
 
+## D33 — Updater: GitHub Releases + minisign, release in bozza
+- `tauri-plugin-updater` legge `latest.json` dall'ultima release. La firma si verifica con la chiave pubblica in `tauri.conf.json`; la chiave privata sta in `~/.tauri/` sul Mac di Marco e nei segreti di GitHub, mai nel repo.
+- Le release nascono in bozza: gli utenti ricevono un aggiornamento solo quando la bozza viene pubblicata a mano, dopo i test.
+- Su Windows l'installazione è `passive`: barra di avanzamento, nessuna domanda.
+- **Alternativa scartata:** un server proprio per gli aggiornamenti. In più dà statistiche e rilasci graduali, ma oggi non serve.
+
+## D34 — Versione unica in `package.json`
+- `tauri.conf.json` ha `"version": "../package.json"` e la pagina Informazioni legge `package_info()`. Cargo resta a 0.1.0 (non finisce nel prodotto).
+
+## D35 — Firma Apple condizionale nel workflow
+- Le credenziali Apple entrano nell'ambiente solo se il segreto `APPLE_CERTIFICATE` esiste: con variabili vuote il bundler di Tauri proverebbe a importare un certificato vuoto e fallirebbe. Senza segreti la build esce firmata ad-hoc, utile per beta private.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

@@ -12,8 +12,8 @@ Ogni domanda ha un **default**: se non arriva una risposta, procedo con quello.
 | Q6 | Mac Intel: Metal sì o no? | No, CPU + Accelerate. Si riapre se qualcuno con un Mac Intel lo misura. |
 | Q7 | Salvare l'audio dei dettati | Disattivato (0 file). L'opzione esiste. |
 | Q8 | Linux senza Secret Service | Errore esplicito, nessun salvataggio in chiaro. Le chiavi si possono passare per variabile d'ambiente (`VOXLOCAL_<PROVIDER>_KEY`), lette solo dal backend. |
-| Q9 | Firma macOS | Serve un **Developer ID Application** (non Apple Development) per notarizzare. Lo gestiamo in Fase 5; in dev firmo con Apple Development. |
-| Q10 | Endpoint e chiavi dell'updater | Release su GitHub (`latest.json`) e coppia di chiavi minisign generata in Fase 5. Repo GitHub da definire. |
+| Q9 | Firma macOS e Windows | Il workflow è pronto (RELEASE.md). Mancano le decisioni commerciali: iscrizione all'Apple Developer Program (99 USD/anno) e il tipo di firma per Windows (consigliato Azure Trusted Signing). Finché mancano, le build escono non notarizzate o non firmate. |
+| Q10 | Repository GitHub | **Da creare** (`gh` non è autenticato su questo Mac). Le chiavi dell'updater sono già generate. Le release devono essere pubbliche: codice privato più repository pubblico solo per le release, se serve (RELEASE.md). |
 | Q11 | Lingua della UI | Per ora **solo italiano**, con i testi raccolti nei componenti. L'inglese serve prima della vendita fuori dall'Italia: estrarre le stringhe in un JSON per lingua, senza libreria. |
 | Q12 | PATH della shell | Rust e cmake universal sono installati, ma `~/.zshrc` non è aggiornato (vedi sotto). Gli script di build impostano il PATH da soli. |
 | Q13 | DMG con layout grafico | `bundle_dmg.sh` di Tauri pilota il Finder via AppleScript e qui va in timeout (manca il permesso Automazione). In locale creo il DMG con `hdiutil`; in CI (Fase 5) il problema non si pone. |

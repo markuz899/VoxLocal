@@ -112,3 +112,33 @@ L'anteprima della UI fuori da Tauri si fa con `mockIPC` di `@tauri-apps/api/mock
 | Avvio a freddo fino al tray | < 1 s | 485 ms il primo avvio, ~115 ms i successivi |
 
 Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log alla voce `totale=`. Va misurato con la prova manuale, perché da qui non posso premere la scorciatoia (vedi il report della Fase 2).
+
+## Checklist di rilascio
+
+Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):
+
+**Build**
+- [ ] CI verde su macOS, Windows e Linux.
+- [ ] `version` aggiornata in `package.json`; il tag è `v` + la stessa versione.
+- [ ] La bozza contiene `.dmg` universal, `.app.tar.gz` con `.sig`, `-setup.exe` con `.sig`, `.AppImage`/`.deb` e `latest.json`.
+- [ ] `latest.json` punta agli URL di questa release e ha una `signature` per ogni piattaforma.
+- [ ] Nessun provider `claude-cli`/`codex-cli` nella build pubblicata (è commerciale, D28).
+
+**macOS** (su un Mac pulito o un altro account utente)
+- [ ] Il `.dmg` si apre senza avvisi di Gatekeeper (`spctl -a -vv /Applications/VoxLocal.app` → "accepted, source=Notarized Developer ID"). Senza segreti Apple: niente notarizzazione, va bene solo per beta privata.
+- [ ] Onboarding completo: permessi, download del modello, dettato di prova.
+- [ ] Dettato in TextEdit, Mail, Slack e Chrome: il testo arriva lì, non nell'overlay.
+- [ ] La parte Intel parte: `arch -x86_64 /Applications/VoxLocal.app/Contents/MacOS/voxlocal help`.
+
+**Windows** (10 e 11)
+- [ ] L'installer parte; si sa quale avviso SmartScreen compare (non firmato) o nessuno (firmato).
+- [ ] Icona nell'area di notifica; onboarding; dettato in Blocco note, Word e Chrome.
+- [ ] Push-to-talk: rilasciando prima il modificatore e poi Spazio la registrazione si ferma comunque (rischio 1 in DECISIONS).
+- [ ] Chiave API salvata in Gestione credenziali e riletta dopo un riavvio.
+
+**Aggiornamento**
+- [ ] Installa la versione precedente, pubblica la nuova: entro un controllo compare la notifica; "Installa e riavvia" porta alla nuova versione e conserva impostazioni, modelli e cronologia.
+
+**Prestazioni** (confronto con la tabella "Metriche misurate")
+- [ ] `cargo run --release --example bench -- --model large-v3-turbo-q5_0`
+- [ ] RAM a riposo e avvio a freddo misurati sulla build pubblicata.

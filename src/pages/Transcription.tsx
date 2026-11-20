@@ -8,31 +8,13 @@ import {
 } from "../api";
 import { useSettings } from "../App";
 import { formatBytes } from "../format";
+import { useT } from "../i18n";
 import { Button, Group, Notice, PageTitle, Row, Select } from "../ui";
 
-// Cosa aspettarsi da ogni modello, misurato su un M1 (DECISIONS D27).
-const NOTES: Record<string, string> = {
-  tiny: "Il più veloce, sbaglia spesso",
-  "tiny-q5_1": "Il più leggero, sbaglia spesso",
-  base: "Veloce, impreciso con la voce reale",
-  "base-q5_1": "Veloce e leggero, impreciso",
-  small: "Equilibrato",
-  "small-q5_1": "Equilibrato e leggero",
-  "medium-q5_0": "Preciso, più lento",
-  "large-v3-turbo-q5_0": "Il più preciso a una velocità da dettatura",
-  "large-v3-turbo": "Il più preciso, richiede più memoria",
-};
-
-const KEEP_WARM: [string, string][] = [
-  ["0", "Rilascia subito"],
-  ["2", "2 minuti"],
-  ["10", "10 minuti"],
-  ["30", "30 minuti"],
-  ["-1", "Sempre"],
-];
-
 export default function Transcription() {
+  const t = useT();
   const { settings, update } = useSettings();
+  const lang = settings.ui_language;
   const [models, setModels] = useState<ModelView[]>([]);
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [progress, setProgress] = useState<Record<string, number>>({});
@@ -69,26 +51,30 @@ export default function Transcription() {
   const cloud = providers.filter((p) => p.stt_model);
   const engine = settings.stt_provider;
   const cloudSelected = cloud.find((p) => p.id === engine);
+  const keepWarm: [string, string][] = [
+    ["0", t("stt.releaseNow")],
+    ["2", t("stt.minutes", { n: 2 })],
+    ["10", t("stt.minutes", { n: 10 })],
+    ["30", t("stt.minutes", { n: 30 })],
+    ["-1", t("stt.always")],
+  ];
 
   return (
     <>
-      <PageTitle
-        title="Trascrizione"
-        description="Il modello locale funziona offline e la voce non lascia il computer. I servizi cloud sono più leggeri per il computer ma inviano l'audio al provider."
-      />
+      <PageTitle title={t("stt.title")} description={t("stt.description")} />
       <Notice tone="error" text={error} />
 
       <Group>
-        <Row label="Motore">
+        <Row label={t("stt.engine")}>
           <Select
-            label="Motore di trascrizione"
+            label={t("stt.engine")}
             value={engine}
             onChange={async (v) => setError(await update({ stt_provider: v }))}
             options={[
-              ["local", "Locale sul computer"],
+              ["local", t("stt.local")],
               ...cloud.map((p): [string, string] => [
                 p.id,
-                `${p.label} (cloud)`,
+                t("stt.cloud", { name: p.label }),
               ]),
             ]}
           />
@@ -97,35 +83,33 @@ export default function Transcription() {
           <Row
             label={
               <span className="text-warn">
-                Manca la chiave di {cloudSelected.label}
+                {t("stt.missingKey", { name: cloudSelected.label })}
               </span>
             }
-            hint="Finché manca, VoxLocal usa il modello locale."
+            hint={t("stt.missingKeyHint")}
           >
             <Button onClick={() => (window.location.hash = "providers")}>
-              Aggiungi chiave
+              {t("stt.addKey")}
             </Button>
           </Row>
         )}
-        <Row
-          label="Tieni il modello in memoria"
-          hint="Più a lungo è caldo, più è veloce il dettato successivo."
-        >
+        <Row label={t("stt.keepWarm")} hint={t("stt.keepWarmHint")}>
           <Select
-            label="Tieni il modello in memoria"
+            label={t("stt.keepWarm")}
             value={String(settings.keep_warm_minutes)}
             onChange={async (v) =>
               setError(await update({ keep_warm_minutes: Number(v) }))
             }
-            options={KEEP_WARM}
+            options={keepWarm}
           />
         </Row>
       </Group>
 
-      <Group title="Modelli locali">
+      <Group title={t("stt.models")}>
         {models.map((m) => {
           const inUse = m.id === settings.local_model;
           const pct = progress[m.id];
+          const note = t(`model.${m.id}` as Parameters<typeof t>[0]);
           return (
             <Row
               key={m.id}
@@ -134,31 +118,33 @@ export default function Transcription() {
                   {m.label}
                   {m.recommended && (
                     <span className="ml-2 text-[12px] text-cobalt">
-                      consigliato
+                      {t("common.recommended")}
                     </span>
                   )}
                 </span>
               }
               hint={
                 pct !== undefined
-                  ? `Scarico… ${Math.floor(pct)}%`
-                  : `${NOTES[m.id] ?? ""}, ${formatBytes(m.size)}`
+                  ? t("stt.downloading", { pct: Math.floor(pct) })
+                  : `${note}, ${formatBytes(m.size, lang)}`
               }
             >
               {inUse && m.installed ? (
-                <span className="text-[12px] text-muted">In uso</span>
+                <span className="text-[12px] text-muted">
+                  {t("common.inUse")}
+                </span>
               ) : m.installed ? (
                 <>
                   <Button
                     variant="ghost"
                     onClick={() => run(() => api.deleteModel(m.id))}
                   >
-                    Elimina
+                    {t("common.delete")}
                   </Button>
                   <Button
                     onClick={() => run(() => update({ local_model: m.id }))}
                   >
-                    Usa
+                    {t("common.use")}
                   </Button>
                 </>
               ) : (
@@ -171,7 +157,7 @@ export default function Transcription() {
                     })
                   }
                 >
-                  Scarica
+                  {t("common.download")}
                 </Button>
               )}
             </Row>

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { api, errorText } from "../api";
+import { useT } from "../i18n";
 import { Button, Notice, PageTitle, TextInput } from "../ui";
 
 export default function Vocabulary() {
+  const t = useT();
   const [terms, setTerms] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -17,11 +19,11 @@ export default function Vocabulary() {
     setError(null);
     try {
       // Più termini in una volta, separati da virgola.
-      for (const t of input
+      for (const term of input
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean)) {
-        await api.addTerm(t);
+        await api.addTerm(term);
       }
       setInput("");
       reload();
@@ -33,38 +35,36 @@ export default function Vocabulary() {
   return (
     <>
       <PageTitle
-        title="Vocabolario"
-        description="Nomi, sigle e termini tecnici scritti come vuoi tu. Aiutano la trascrizione e vengono passati all'LLM."
+        title={t("vocab.title")}
+        description={t("vocab.description")}
       />
       <form onSubmit={add} className="mb-5 flex gap-2">
         <TextInput
           className="flex-1"
-          placeholder="Es. Kubernetes, Giorgio Rossi, ACME S.p.A."
+          placeholder={t("vocab.placeholder")}
+          aria-label={t("vocab.title")}
           value={input}
           onChange={(e) => setInput(e.target.value)}
         />
         <Button type="submit" variant="primary" disabled={!input.trim()}>
-          Aggiungi
+          {t("vocab.add")}
         </Button>
       </form>
       <Notice tone="error" text={error} />
       {terms.length === 0 ? (
-        <p className="text-muted">
-          Ancora nessun termine. Aggiungi le parole che la trascrizione sbaglia
-          più spesso.
-        </p>
+        <p className="text-muted">{t("vocab.empty")}</p>
       ) : (
         <ul className="flex flex-wrap gap-2">
-          {terms.map((t) => (
+          {terms.map((term) => (
             <li
-              key={t}
+              key={term}
               className="flex items-center gap-1 rounded-full border border-line bg-surface py-1 pr-1 pl-3"
             >
-              <span className="selectable">{t}</span>
+              <span className="selectable">{term}</span>
               <button
                 type="button"
-                aria-label={`Rimuovi ${t}`}
-                onClick={() => api.removeTerm(t).then(reload)}
+                aria-label={t("vocab.removeTerm", { term })}
+                onClick={() => api.removeTerm(term).then(reload)}
                 className="grid h-5 w-5 place-items-center rounded-full text-muted hover:bg-paper hover:text-ink"
               >
                 ×

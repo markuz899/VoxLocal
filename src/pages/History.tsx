@@ -8,28 +8,16 @@ import {
   type HistoryItem,
   type PipelineState,
 } from "../api";
+import { useSettings } from "../App";
 import { diffWords } from "../diff";
-import { formatDate, formatMs, LANGUAGES } from "../format";
+import { formatDate, formatMs, languageName } from "../format";
+import { modeName, useT } from "../i18n";
 import { Button, Notice, Select, TextInput } from "../ui";
 
 const PAGE = 50;
 
-const STATUS: Record<HistoryItem["status"], string> = {
-  ok: "Incollato",
-  llm_fallback: "Senza elaborazione",
-  cancelled: "Annullato",
-  paste_failed: "Negli appunti",
-  error: "Errore",
-};
-
-const LIVE: Record<Exclude<PipelineState, "idle">, string> = {
-  recording: "In ascolto",
-  transcribing: "Trascrivo",
-  postprocessing: "Riscrivo",
-  pasting: "Incollo",
-};
-
 type Period = "today" | "week" | "all";
+type Live = Exclude<PipelineState, "idle">;
 
 /** Inizio di oggi e di sette giorni fa, nell'ora locale. */
 function periodStarts() {
@@ -60,6 +48,9 @@ function AppBadge({ app }: { app: string | null }) {
 }
 
 export default function History() {
+  const t = useT();
+  const { settings } = useSettings();
+  const lang = settings.ui_language;
   const [facets, setFacets] = useState<HistoryFacets | null>(null);
   const [items, setItems] = useState<HistoryItem[]>([]);
   const [more, setMore] = useState(false);
@@ -68,10 +59,9 @@ export default function History() {
   const [mode, setMode] = useState("");
   const [app, setApp] = useState("");
   const [selected, setSelected] = useState<number | null>(null);
-  const [live, setLive] = useState<{
-    state: PipelineState;
-    app: string | null;
-  } | null>(null);
+  const [live, setLive] = useState<{ state: Live; app: string | null } | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
@@ -127,8 +117,8 @@ export default function History() {
 
   // Ricerca mentre si scrive, con un piccolo ritardo.
   useEffect(() => {
-    const t = setTimeout(() => load(0), 150);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => load(0), 150);
+    return () => clearTimeout(timer);
   }, [load]);
 
   // Il dettato in corso compare in cima; quando finisce la lista si ricarica.
@@ -145,24 +135,24 @@ export default function History() {
   const current = items.find((i) => i.id === selected) ?? null;
 
   const periods: [Period, string, number | undefined][] = [
-    ["today", "Oggi", facets?.today],
-    ["week", "Settimana", facets?.week],
-    ["all", "Tutto", facets?.total],
+    ["today", t("history.today"), facets?.today],
+    ["week", t("history.week"), facets?.week],
+    ["all", t("history.all"), facets?.total],
   ];
 
   return (
     <div className="flex h-[calc(100vh-5rem)] min-h-[480px] flex-col">
       <header className="mb-4 flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-[22px] font-semibold tracking-tight">
-          Cronologia
+          {t("history.title")}
         </h1>
         {confirmClear ? (
           <span className="flex items-center gap-2">
             <Button variant="danger" onClick={clearAll}>
-              Elimina {facets?.total ?? ""} dettati
+              {t("history.clearConfirm", { n: facets?.total ?? "" })}
             </Button>
             <Button variant="ghost" onClick={() => setConfirmClear(false)}>
-              Annulla
+              {t("common.cancel")}
             </Button>
           </span>
         ) : (
@@ -171,12 +161,12 @@ export default function History() {
             disabled={!facets?.total}
             onClick={() => setConfirmClear(true)}
           >
-            Svuota la cronologia
+            {t("history.clear")}
           </Button>
         )}
         <div
           role="group"
-          aria-label="Periodo"
+          aria-label={t("history.period")}
           className="flex rounded-md border border-line bg-surface p-0.5"
         >
           {periods.map(([id, label, n]) => (
@@ -197,22 +187,25 @@ export default function History() {
           ))}
         </div>
         <Select
-          label="Modalità"
+          label={t("meta.mode")}
           value={mode}
           onChange={setMode}
           options={[
-            ["", "Tutte le modalità"],
+            ["", t("history.allModes")],
             ...(facets?.modes ?? []).map(
-              ([slug, name, n]): [string, string] => [slug, `${name} (${n})`],
+              ([slug, name, n]): [string, string] => [
+                slug,
+                `${modeName(slug, name, lang)} (${n})`,
+              ],
             ),
           ]}
         />
         <Select
-          label="App"
+          label={t("meta.app")}
           value={app}
           onChange={setApp}
           options={[
-            ["", "Tutte le app"],
+            ["", t("history.allApps")],
             ...(facets?.apps ?? []).map(([a, n]): [string, string] => [
               a,
               `${a} (${n})`,
@@ -228,36 +221,41 @@ export default function History() {
             <TextInput
               type="search"
               className="w-full"
-              placeholder="Cerca nei dettati"
-              aria-label="Cerca nei dettati"
+              placeholder={t("history.search")}
+              aria-label={t("history.search")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
-          <ul className="min-h-0 flex-1 overflow-y-auto" aria-label="Dettati">
+          <ul
+            className="min-h-0 flex-1 overflow-y-auto"
+            aria-label={t("history.list")}
+          >
             {live && (
               <li className="flex items-center gap-3 border-b border-line bg-cobalt-soft/50 px-3 py-2.5">
                 <AppBadge app={live.app} />
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium">
-                    {live.app ?? "Dettato in corso"}
+                  <div className="truncate font-medium">
+                    {live.app ?? t("history.inProgress")}
                   </div>
-                  <div className="text-[12px] text-muted">Adesso</div>
+                  <div className="text-[12px] text-muted">
+                    {t("history.now")}
+                  </div>
                 </div>
-                <span className="flex items-center gap-1.5 rounded-full border border-cobalt/40 px-2 py-0.5 text-[12px] text-cobalt">
+                <span className="flex shrink-0 items-center gap-1.5 rounded-full border border-cobalt/40 px-2 py-0.5 text-[12px] text-cobalt">
                   <span
                     className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-cobalt border-r-transparent"
                     aria-hidden
                   />
-                  {LIVE[live.state as Exclude<PipelineState, "idle">]}
+                  {t(`live.${live.state}`)}
                 </span>
               </li>
             )}
             {items.length === 0 && !live && (
               <li className="p-4 text-muted">
                 {query || mode || app || period !== "all"
-                  ? "Nessun dettato con questi filtri."
-                  : "Qui compariranno i tuoi dettati."}
+                  ? t("history.noResults")
+                  : t("history.empty")}
               </li>
             )}
             {items.map((item) => (
@@ -277,20 +275,23 @@ export default function History() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
                       <span className="min-w-0 truncate font-medium">
-                        {item.target_app ?? "App sconosciuta"}
+                        {item.target_app ?? t("history.unknownApp")}
                       </span>
                       <span className="ml-auto shrink-0 text-[12px] text-muted">
-                        {formatDate(item.created_at)}
+                        {formatDate(item.created_at, lang)}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="min-w-0 flex-1 truncate text-[13px] text-muted">
+                        {item.command && (
+                          <span className="text-cobalt">⌘ </span>
+                        )}
                         {item.final_text}
                       </span>
                       {/* Solo gli stati da notare: un dettato incollato è il caso normale. */}
                       {item.status !== "ok" && (
                         <span className="shrink-0 rounded-full border border-warn/50 px-1.5 text-[11px] leading-[18px] text-warn">
-                          {STATUS[item.status]}
+                          {t(`status.${item.status}`)}
                         </span>
                       )}
                     </div>
@@ -301,7 +302,9 @@ export default function History() {
             ))}
             {more && (
               <li className="p-3 text-center">
-                <Button onClick={() => load(items.length)}>Mostra altri</Button>
+                <Button onClick={() => load(items.length)}>
+                  {t("history.more")}
+                </Button>
               </li>
             )}
           </ul>
@@ -317,9 +320,7 @@ export default function History() {
               }}
             />
           ) : (
-            <p className="p-6 text-muted">
-              Scegli un dettato per vederne i dettagli.
-            </p>
+            <p className="p-6 text-muted">{t("history.pick")}</p>
           )}
         </div>
       </div>
@@ -329,12 +330,15 @@ export default function History() {
 
 /** Cestino sulla riga: compare al passaggio o con la tastiera; il primo clic chiede conferma. */
 function RowDelete({ onDelete }: { onDelete: () => void }) {
+  const t = useT();
   const [armed, setArmed] = useState(false);
   return (
     <button
       type="button"
-      aria-label={armed ? "Conferma: elimina il dettato" : "Elimina il dettato"}
-      title={armed ? "Clic di nuovo per eliminare" : "Elimina"}
+      aria-label={
+        armed ? t("history.deleteRowConfirm") : t("history.deleteRow")
+      }
+      title={armed ? t("history.clickAgain") : t("common.delete")}
       onClick={() => (armed ? onDelete() : setArmed(true))}
       onBlur={() => setArmed(false)}
       className={`absolute top-1/2 right-2 grid h-7 -translate-y-1/2 place-items-center rounded-md px-1.5 text-[12px] transition-opacity focus-visible:opacity-100 ${
@@ -344,7 +348,7 @@ function RowDelete({ onDelete }: { onDelete: () => void }) {
       }`}
     >
       {armed ? (
-        "Elimina"
+        t("common.delete")
       ) : (
         <svg
           viewBox="0 0 16 16"
@@ -371,6 +375,9 @@ function Detail({
   item: HistoryItem;
   onDeleted: () => void;
 }) {
+  const t = useT();
+  const { settings } = useSettings();
+  const lang = settings.ui_language;
   const [showRaw, setShowRaw] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -381,54 +388,70 @@ function Detail({
   );
   const processed = item.raw_text !== item.final_text;
   const changedCount = segments.filter((s) => s.changed).length;
+  const mode = item.command
+    ? t("history.command")
+    : item.mode && modeName(item.mode_slug, item.mode, lang);
 
   const copy = async (text: string, what: string) => {
     await api.copyText(text);
-    setNotice(`${what} copiato negli appunti.`);
+    setNotice(t("history.copied", { what }));
     setTimeout(() => setNotice(null), 2000);
   };
 
-  const language =
-    LANGUAGES.find(([code]) => code === item.language)?.[1] ?? item.language;
   const meta: [string, string | null][] = [
-    ["App", item.target_app],
-    ["Modalità", item.mode],
-    ["Lingua", language],
-    ["Microfono", item.audio_device ?? "Microfono di sistema"],
+    [t("meta.app"), item.target_app],
+    [t("meta.mode"), mode],
     [
-      "Trascrizione",
+      t("meta.language"),
+      item.language ? languageName(item.language, lang) : null,
+    ],
+    [t("meta.microphone"), item.audio_device ?? t("common.systemMic")],
+    [
+      t("meta.transcription"),
       [
-        item.stt_provider === "local" ? "Locale" : item.stt_provider,
+        item.stt_provider === "local" ? t("meta.local") : item.stt_provider,
         item.stt_model,
       ]
         .filter(Boolean)
         .join(", "),
     ],
     [
-      "Elaborazione",
+      t("meta.processing"),
       item.llm_provider
         ? [item.llm_provider, item.llm_model].filter(Boolean).join(", ")
-        : "Nessuna",
+        : t("meta.none"),
     ],
   ];
   const times: [string, number | null][] = [
-    ["Audio", item.audio_ms],
-    ["Trascrizione", item.stt_ms],
-    ["Elaborazione", item.llm_ms],
-    ["Incolla", item.paste_ms],
-    ["Totale", item.total_ms],
+    [t("time.audio"), item.audio_ms],
+    [t("time.transcription"), item.stt_ms],
+    [t("time.processing"), item.llm_ms],
+    [t("time.paste"), item.paste_ms],
+    [t("time.total"), item.total_ms],
   ];
+  // Per un comando il "detto" è la selezione originale, non la voce.
+  const saidLabel = item.command
+    ? t("history.selectionChanged")
+    : t("history.said");
 
   return (
     <article className="p-6">
       <div className="mb-1 text-[12px] text-muted">
-        {[item.target_app, item.mode, formatDate(item.created_at)]
+        {[item.target_app, mode, formatDate(item.created_at, lang)]
           .filter(Boolean)
           .join(", ")}
       </div>
+      {item.command && (
+        <p className="mt-2 text-[14px]">
+          <span className="font-medium text-cobalt">
+            {t("history.command")}:{" "}
+          </span>
+          <span className="selectable">“{item.command}”</span>
+        </p>
+      )}
       {item.status !== "ok" && (
         <p className="mb-3 text-[13px] text-warn">
-          {STATUS[item.status]}
+          {t(`status.${item.status}`)}
           {item.error ? `: ${item.error}` : ""}
         </p>
       )}
@@ -460,14 +483,14 @@ function Detail({
         >
           <div className="flex items-center gap-2 text-[12px] font-medium">
             <span className="h-2 w-2 rounded-full bg-cobalt" aria-hidden />{" "}
-            Detto
+            {saidLabel}
           </div>
           <p className="mt-1 text-[14px]">
             {note === null
-              ? "Passa sulle parti sottolineate per vedere cosa avevi detto."
+              ? t("history.hoverHint")
               : note
                 ? `“${note}”`
-                : "Aggiunto dall'elaborazione: non l'avevi detto."}
+                : t("history.added")}
           </p>
         </aside>
       )}
@@ -475,17 +498,17 @@ function Detail({
       <div className="mt-5 flex flex-wrap gap-2">
         <Button
           variant="primary"
-          onClick={() => copy(item.final_text, "Testo")}
+          onClick={() => copy(item.final_text, t("history.textWord"))}
         >
-          Copia il testo
+          {t("history.copyText")}
         </Button>
         {processed && (
           <>
-            <Button onClick={() => copy(item.raw_text, "Testo detto")}>
-              Copia il testo detto
+            <Button onClick={() => copy(item.raw_text, t("history.saidWord"))}>
+              {t("history.copySaid")}
             </Button>
             <Button variant="ghost" onClick={() => setShowRaw(!showRaw)}>
-              {showRaw ? "Mostra il testo scritto" : "Mostra il testo detto"}
+              {showRaw ? t("history.showWritten") : t("history.showSaid")}
             </Button>
           </>
         )}
@@ -499,15 +522,15 @@ function Detail({
                 onDeleted();
               }}
             >
-              Elimina
+              {t("common.delete")}
             </Button>
             <Button variant="ghost" onClick={() => setConfirm(false)}>
-              Annulla
+              {t("common.cancel")}
             </Button>
           </>
         ) : (
           <Button variant="ghost" onClick={() => setConfirm(true)}>
-            Elimina
+            {t("common.delete")}
           </Button>
         )}
       </div>
@@ -525,7 +548,7 @@ function Detail({
         {times.map(([k, v]) => (
           <div key={k}>
             <dt className="text-[12px] text-muted">{k}</dt>
-            <dd className="m-0 text-[15px] font-medium">{formatMs(v)}</dd>
+            <dd className="m-0 text-[15px] font-medium">{formatMs(v, lang)}</dd>
           </div>
         ))}
       </dl>

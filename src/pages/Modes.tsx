@@ -7,17 +7,22 @@ import {
   type ProviderView,
 } from "../api";
 import { useSettings } from "../App";
+import { languageOptions } from "../format";
+import { MODE_LIBRARY, modeName, useT, type Lang } from "../i18n";
 import { Button, Notice, PageTitle, Select, TextInput } from "../ui";
 
 const BUILTIN = ["raw", "clean", "email", "message", "bullets", "translate_en"];
 
 export default function Modes() {
+  const t = useT();
   const { settings, update } = useSettings();
+  const lang = settings.ui_language;
   const [modes, setModes] = useState<Mode[]>([]);
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [slug, setSlug] = useState(settings.active_mode);
   const [draft, setDraft] = useState<Mode | null>(null);
   const [models, setModels] = useState<string[]>([]);
+  const [library, setLibrary] = useState(false);
   const [notice, setNotice] = useState<{
     text: string;
     tone: "ok" | "error";
@@ -72,19 +77,22 @@ export default function Modes() {
     act(async () => {
       await api.updateMode(draft);
       await reload(draft.slug);
-    }, "Modalità salvata.");
+    }, t("common.saved"));
 
   const select = (m: Mode) => {
     setSlug(m.slug);
     setDraft(m);
+    setLibrary(false);
     setNotice(null);
   };
+
+  const label = (m: Mode) => modeName(m.slug, m.name, lang);
 
   return (
     <>
       <PageTitle
-        title="Modalità"
-        description="Ogni modalità decide cosa succede al testo dopo la trascrizione. Si sceglie anche dal menu nella barra."
+        title={t("modes.title")}
+        description={t("modes.description")}
       />
       <div className="flex gap-6">
         <div className="w-44 shrink-0">
@@ -95,14 +103,16 @@ export default function Modes() {
                   type="button"
                   onClick={() => select(m)}
                   className={`flex w-full items-center justify-between px-3 py-2 text-left ${
-                    m.slug === slug ? "bg-cobalt-soft text-cobalt" : ""
+                    m.slug === slug && !library
+                      ? "bg-cobalt-soft text-cobalt"
+                      : ""
                   }`}
                 >
-                  <span className="truncate">{m.name}</span>
+                  <span className="truncate">{label(m)}</span>
                   {m.slug === settings.active_mode && (
                     <span
                       className="ml-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cobalt"
-                      title="Attiva"
+                      title={t("modes.active")}
                     />
                   )}
                 </button>
@@ -113,153 +123,242 @@ export default function Modes() {
             className="mt-3 w-full"
             onClick={() =>
               act(async () => {
-                const s = await api.createMode("Nuova modalità");
+                const s = await api.createMode(t("modes.newName"));
                 await reload(s);
-              }, "Modalità creata.")
+                setLibrary(false);
+              }, t("modes.created"))
             }
           >
-            Nuova modalità
+            {t("modes.new")}
+          </Button>
+          <Button
+            className={`mt-2 w-full ${library ? "border-cobalt text-cobalt" : ""}`}
+            onClick={() => setLibrary(!library)}
+          >
+            {t("modes.fromLibrary")}
           </Button>
         </div>
 
-        <div className="min-w-0 flex-1 space-y-4">
-          <label className="block">
-            <span className="mb-1 block text-[12px] text-muted">Nome</span>
-            <TextInput
-              className="w-full"
-              value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-            />
-          </label>
-
-          <div className="flex gap-3">
-            <label className="flex-1">
+        {library ? (
+          <Library
+            existing={modes.map((m) => m.name)}
+            onAdded={async (s) => {
+              await reload(s);
+            }}
+          />
+        ) : (
+          <div className="min-w-0 flex-1 space-y-4">
+            <label className="block">
               <span className="mb-1 block text-[12px] text-muted">
-                Elaborazione
+                {t("modes.name")}
               </span>
-              <Select
-                label="Provider"
-                className="w-full max-w-none"
-                value={draft.provider_id ?? ""}
-                onChange={(v) => setDraft({ ...draft, provider_id: v || null })}
-                options={[
-                  ["", `Predefinito: ${defaultLabel}`],
-                  ["none", "Nessuna: incolla il testo trascritto"],
-                  ...providers
-                    .filter((p) => p.kind !== "none")
-                    .map((p): [string, string] => [p.id, p.label]),
-                ]}
+              <TextInput
+                className="w-full"
+                value={draft.name}
+                onChange={(e) => setDraft({ ...draft, name: e.target.value })}
               />
             </label>
+
+            <div className="flex gap-3">
+              <label className="flex-1">
+                <span className="mb-1 block text-[12px] text-muted">
+                  {t("modes.processing")}
+                </span>
+                <Select
+                  label={t("modes.processing")}
+                  className="w-full max-w-none"
+                  value={draft.provider_id ?? ""}
+                  onChange={(v) =>
+                    setDraft({ ...draft, provider_id: v || null })
+                  }
+                  options={[
+                    ["", t("modes.default", { name: defaultLabel })],
+                    ["none", t("modes.none")],
+                    ...providers
+                      .filter((p) => p.kind !== "none")
+                      .map((p): [string, string] => [p.id, p.label]),
+                  ]}
+                />
+              </label>
+              {!isRaw && (
+                <label className="w-48">
+                  <span className="mb-1 block text-[12px] text-muted">
+                    {t("modes.model")}
+                  </span>
+                  <TextInput
+                    className="w-full"
+                    list="mode-models"
+                    placeholder={t("modes.modelPlaceholder")}
+                    value={draft.model ?? ""}
+                    onChange={(e) =>
+                      setDraft({ ...draft, model: e.target.value || null })
+                    }
+                  />
+                  <datalist id="mode-models">
+                    {models.map((m) => (
+                      <option key={m} value={m} />
+                    ))}
+                  </datalist>
+                </label>
+              )}
+            </div>
+
+            {(draft.slug === "translate_en" ||
+              draft.system_prompt.includes("{{target_language}}")) && (
+              <label className="block">
+                <span className="mb-1 block text-[12px] text-muted">
+                  {t("modes.translateTo")}
+                </span>
+                <Select
+                  label={t("modes.translateTo")}
+                  value={settings.translate_to}
+                  onChange={(translate_to) => update({ translate_to })}
+                  options={languageOptions(lang)}
+                />
+              </label>
+            )}
+
             {!isRaw && (
-              <label className="w-48">
-                <span className="mb-1 block text-[12px] text-muted">
-                  Modello
-                </span>
-                <TextInput
-                  className="w-full"
-                  list="mode-models"
-                  placeholder="quello del provider"
-                  value={draft.model ?? ""}
-                  onChange={(e) =>
-                    setDraft({ ...draft, model: e.target.value || null })
-                  }
-                />
-                <datalist id="mode-models">
-                  {models.map((m) => (
-                    <option key={m} value={m} />
-                  ))}
-                </datalist>
-              </label>
+              <>
+                <label className="block">
+                  <span className="mb-1 block text-[12px] text-muted">
+                    {t("modes.instructions")}
+                  </span>
+                  <textarea
+                    spellCheck={false}
+                    value={draft.system_prompt}
+                    onChange={(e) =>
+                      setDraft({ ...draft, system_prompt: e.target.value })
+                    }
+                    className="h-44 w-full resize-y rounded-[10px] border border-line bg-surface p-3 text-[13px] leading-relaxed"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[12px] text-muted">
+                    {t("modes.message")}
+                  </span>
+                  <textarea
+                    spellCheck={false}
+                    rows={3}
+                    value={draft.user_template}
+                    onChange={(e) =>
+                      setDraft({ ...draft, user_template: e.target.value })
+                    }
+                    className="w-full resize-y rounded-[10px] border border-line bg-surface p-3 font-mono text-[12px]"
+                  />
+                </label>
+              </>
             )}
-          </div>
 
-          {!isRaw && (
-            <>
-              <label className="block">
-                <span className="mb-1 block text-[12px] text-muted">
-                  Istruzioni per l'LLM. Variabili: {"{{language}}"},{" "}
-                  {"{{vocabulary}}"}
-                </span>
-                <textarea
-                  spellCheck={false}
-                  value={draft.system_prompt}
-                  onChange={(e) =>
-                    setDraft({ ...draft, system_prompt: e.target.value })
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <Button variant="primary" disabled={!dirty} onClick={save}>
+                {t("common.save")}
+              </Button>
+              {draft.slug !== settings.active_mode && (
+                <Button
+                  onClick={() =>
+                    act(
+                      async () => {
+                        const err = await update({ active_mode: draft.slug });
+                        if (err) throw err;
+                      },
+                      t("modes.isActive", { name: label(draft) }),
+                    )
                   }
-                  className="h-44 w-full resize-y rounded-[10px] border border-line bg-surface p-3 text-[13px] leading-relaxed"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[12px] text-muted">
-                  Messaggio inviato. {"{{text}}"} è il testo dettato.
-                </span>
-                <textarea
-                  spellCheck={false}
-                  rows={3}
-                  value={draft.user_template}
-                  onChange={(e) =>
-                    setDraft({ ...draft, user_template: e.target.value })
+                >
+                  {t("modes.useThis")}
+                </Button>
+              )}
+              <span className="flex-1" />
+              {builtin ? (
+                <Button
+                  variant="ghost"
+                  onClick={() =>
+                    act(async () => {
+                      await api.resetMode(draft.slug);
+                      await reload(draft.slug);
+                    }, t("modes.restored"))
                   }
-                  className="w-full resize-y rounded-[10px] border border-line bg-surface p-3 font-mono text-[12px]"
-                />
-              </label>
-            </>
-          )}
-
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            <Button variant="primary" disabled={!dirty} onClick={save}>
-              Salva
-            </Button>
-            {draft.slug !== settings.active_mode && (
-              <Button
-                onClick={() =>
-                  act(async () => {
-                    const err = await update({ active_mode: draft.slug });
-                    if (err) throw err;
-                  }, `${draft.name} è la modalità attiva.`)
-                }
-              >
-                Usa questa modalità
-              </Button>
-            )}
-            <span className="flex-1" />
-            {builtin ? (
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  act(async () => {
-                    await api.resetMode(draft.slug);
-                    await reload(draft.slug);
-                  }, "Ripristinata.")
-                }
-              >
-                Ripristina originale
-              </Button>
-            ) : (
-              <Button
-                variant="danger"
-                onClick={() =>
-                  act(async () => {
-                    await api.deleteMode(draft.slug);
-                    await reload("raw");
-                  }, "Modalità eliminata.")
-                }
-              >
-                Elimina
-              </Button>
-            )}
+                >
+                  {t("modes.reset")}
+                </Button>
+              ) : (
+                <Button
+                  variant="danger"
+                  onClick={() =>
+                    act(async () => {
+                      await api.deleteMode(draft.slug);
+                      await reload("raw");
+                    }, t("modes.deleted"))
+                  }
+                >
+                  {t("common.delete")}
+                </Button>
+              )}
+            </div>
+            {notice && <Notice tone={notice.tone} text={notice.text} />}
           </div>
-          {notice && <Notice tone={notice.tone} text={notice.text} />}
-        </div>
+        )}
       </div>
       <AppRules modes={modes} />
     </>
   );
 }
 
+/** La libreria di modalità pronte: un clic e la modalità è tua, da modificare come vuoi. */
+function Library({
+  existing,
+  onAdded,
+}: {
+  existing: string[];
+  onAdded: (slug: string) => void;
+}) {
+  const t = useT();
+  const { settings } = useSettings();
+  const lang: Lang = settings.ui_language === "it" ? "it" : "en";
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="min-w-0 flex-1">
+      <h2 className="text-[17px] font-semibold">{t("library.title")}</h2>
+      <p className="mb-4 text-muted">{t("library.description")}</p>
+      <ul className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
+        {MODE_LIBRARY.map((m) => {
+          const added = existing.includes(m.name[lang]);
+          return (
+            <li
+              key={m.id}
+              className="flex flex-col rounded-[10px] border border-line bg-surface p-4"
+            >
+              <span className="font-medium">{m.name[lang]}</span>
+              <span className="mt-1 flex-1 text-[13px] text-muted">
+                {m.description[lang]}
+              </span>
+              <Button
+                className="mt-3 self-start"
+                disabled={added}
+                onClick={async () => {
+                  try {
+                    onAdded(await api.createModeWithTask(m.name[lang], m.task));
+                  } catch (e) {
+                    setError(errorText(e));
+                  }
+                }}
+              >
+                {added ? t("library.added") : t("library.add")}
+              </Button>
+            </li>
+          );
+        })}
+      </ul>
+      <Notice tone="error" text={error} />
+    </div>
+  );
+}
+
 /** Regole "app → modalità": vincono sulla modalità attiva quando il dettato parte in quell'app. */
 function AppRules({ modes }: { modes: Mode[] }) {
+  const t = useT();
   const { settings, update } = useSettings();
   const [recent, setRecent] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -274,32 +373,29 @@ function AppRules({ modes }: { modes: Mode[] }) {
 
   const save = async (next: AppMode[]) =>
     setError(await update({ app_modes: next }));
-  const modeOptions = modes.map((m): [string, string] => [m.slug, m.name]);
+  const modeOptions = modes.map((m): [string, string] => [
+    m.slug,
+    modeName(m.slug, m.name, settings.ui_language),
+  ]);
 
   return (
     <section className="mt-10" aria-labelledby="rules-h">
       <h2 id="rules-h" className="mb-1 text-[17px] font-semibold">
-        Modalità per app
+        {t("rules.title")}
       </h2>
-      <p className="mb-4 max-w-[60ch] text-muted">
-        Quando detti in un'app di questo elenco, VoxLocal usa la sua modalità al
-        posto di quella attiva. Basta una parte del nome: "Mail" vale anche per
-        "Microsoft Outlook Mail".
-      </p>
+      <p className="mb-4 max-w-[60ch] text-muted">{t("rules.description")}</p>
       <div className="divide-y divide-line rounded-[10px] border border-line bg-surface">
         {rules.length === 0 && (
-          <p className="px-4 py-3 text-muted">
-            Nessuna regola: ogni dettato usa la modalità attiva.
-          </p>
+          <p className="px-4 py-3 text-muted">{t("rules.empty")}</p>
         )}
         {rules.map((r, i) => (
           <div key={i} className="flex items-center gap-3 px-4 py-2.5">
             <TextInput
-              aria-label="App"
+              aria-label={t("rules.app")}
               list="recent-apps"
               className="w-56"
               value={r.app}
-              placeholder="Nome dell'app"
+              placeholder={t("rules.appPlaceholder")}
               onChange={(e) =>
                 save(
                   rules.map((x, k) =>
@@ -308,9 +404,9 @@ function AppRules({ modes }: { modes: Mode[] }) {
                 )
               }
             />
-            <span className="text-muted">usa</span>
+            <span className="text-muted">{t("rules.uses")}</span>
             <Select
-              label="Modalità"
+              label={t("meta.mode")}
               value={r.mode}
               onChange={(mode) =>
                 save(rules.map((x, k) => (k === i ? { ...x, mode } : x)))
@@ -322,7 +418,7 @@ function AppRules({ modes }: { modes: Mode[] }) {
               variant="ghost"
               onClick={() => save(rules.filter((_, k) => k !== i))}
             >
-              Rimuovi
+              {t("common.remove")}
             </Button>
           </div>
         ))}
@@ -344,7 +440,7 @@ function AppRules({ modes }: { modes: Mode[] }) {
           ])
         }
       >
-        Aggiungi una regola
+        {t("rules.add")}
       </Button>
       <Notice tone="error" text={error} />
     </section>

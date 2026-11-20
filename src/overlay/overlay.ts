@@ -1,14 +1,33 @@
 // Overlay della dettatura: livello del microfono e stato della pipeline.
-import { events, type PipelineState } from "../api";
+import { api, events, type PipelineState } from "../api";
 
 const BARS = 16;
-const LABELS: Record<PipelineState, string> = {
-  idle: "",
-  recording: "In ascolto",
-  transcribing: "Trascrivo",
-  postprocessing: "Elaboro",
-  pasting: "Incollo",
+const LABELS: Record<string, Record<PipelineState, string>> = {
+  en: {
+    idle: "",
+    recording: "Listening",
+    transcribing: "Transcribing",
+    postprocessing: "Rewriting",
+    pasting: "Pasting",
+  },
+  it: {
+    idle: "",
+    recording: "In ascolto",
+    transcribing: "Trascrivo",
+    postprocessing: "Riscrivo",
+    pasting: "Incollo",
+  },
 };
+
+// L'overlay è una finestra a parte: legge la lingua dell'interfaccia quando si apre.
+let labels = LABELS.en;
+api.getSettings().then(
+  (s) => {
+    labels = LABELS[s.ui_language] ?? LABELS.en;
+    if (state !== "idle") label.textContent = labels[state];
+  },
+  () => {},
+);
 
 const pill = document.querySelector<HTMLElement>(".pill")!;
 const label = document.querySelector<HTMLElement>(".label")!;
@@ -26,7 +45,7 @@ let state: PipelineState = "idle";
 events.state((s) => {
   state = s;
   pill.dataset.state = s;
-  label.textContent = LABELS[s];
+  label.textContent = labels[s];
   if (s !== "recording") {
     for (const bar of bars) {
       bar.classList.remove("on");

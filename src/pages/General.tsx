@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { api, errorText } from "../api";
 import { useSettings } from "../App";
-import { LANGUAGES } from "../format";
+import { languageOptions } from "../format";
+import { UI_LANGUAGES, useT } from "../i18n";
 import {
   Button,
   Group,
@@ -14,16 +15,10 @@ import {
   Toggle,
 } from "../ui";
 
-const RETENTION: [string, string][] = [
-  ["7", "7 giorni"],
-  ["30", "30 giorni"],
-  ["90", "90 giorni"],
-  ["365", "1 anno"],
-  ["0", "Per sempre"],
-];
-
 export default function General() {
+  const t = useT();
   const { settings, update } = useSettings();
+  const lang = settings.ui_language;
   const [devices, setDevices] = useState<string[]>([]);
   const [autostart, setAutostart] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -50,63 +45,101 @@ export default function General() {
   const save = async (patch: Parameters<typeof update>[0]) =>
     setError(await update(patch));
 
+  const retention: [string, string][] = [
+    ["7", t("general.days", { n: 7 })],
+    ["30", t("general.days", { n: 30 })],
+    ["90", t("general.days", { n: 90 })],
+    ["365", t("general.year")],
+    ["0", t("general.forever")],
+  ];
+
   return (
     <>
-      <PageTitle title="Generale" />
+      <PageTitle title={t("general.title")} />
       <Notice tone="error" text={error} />
 
-      <Group title="Dettatura">
-        <Row label="Scorciatoia" hint="Funziona in qualsiasi app. Esc annulla.">
+      <Group>
+        <Row label={t("general.uiLanguage")}>
+          <Select
+            label={t("general.uiLanguage")}
+            value={lang}
+            onChange={(ui_language) => save({ ui_language })}
+            options={UI_LANGUAGES}
+          />
+        </Row>
+      </Group>
+
+      <Group title={t("general.dictation")}>
+        <Row label={t("general.shortcut")} hint={t("general.shortcutHint")}>
           <HotkeyInput
             value={settings.hotkey}
             onChange={(hotkey) => save({ hotkey })}
           />
         </Row>
-        <Row label="Come si attiva">
+        <Row label={t("general.activation")}>
           <Select
-            label="Come si attiva"
+            label={t("general.activation")}
             value={settings.hotkey_mode}
             onChange={(v) => save({ hotkey_mode: v as "ptt" | "toggle" })}
             options={[
-              ["ptt", "Tieni premuto per parlare"],
-              ["toggle", "Premi per avviare e fermare"],
+              ["ptt", t("general.ptt")],
+              ["toggle", t("general.toggle")],
             ]}
           />
         </Row>
         <Row
-          label="Lingua"
-          hint="Fissarla rende la trascrizione più precisa e veloce."
+          label={t("general.commandShortcut")}
+          hint={t("general.commandShortcutHint")}
         >
+          <HotkeyInput
+            value={settings.command_hotkey}
+            onChange={(command_hotkey) => save({ command_hotkey })}
+          />
+        </Row>
+        <Row label={t("general.language")} hint={t("general.languageHint")}>
           <Select
-            label="Lingua"
+            label={t("general.language")}
             value={settings.language}
             onChange={(language) => save({ language })}
-            options={LANGUAGES}
+            options={languageOptions(lang, true)}
+          />
+        </Row>
+        <Row
+          label={t("general.translateTo")}
+          hint={t("general.translateToHint")}
+        >
+          <Select
+            label={t("general.translateTo")}
+            value={settings.translate_to}
+            onChange={(translate_to) => save({ translate_to })}
+            options={languageOptions(lang)}
           />
         </Row>
       </Group>
 
-      <Group title="Microfono">
-        <Row label="Dispositivo">
+      <Group title={t("general.microphone")}>
+        <Row label={t("general.device")}>
           <Select
-            label="Microfono"
+            label={t("general.microphone")}
             value={settings.audio_device ?? ""}
             onChange={(v) => save({ audio_device: v || null })}
             options={[
-              ["", "Microfono di sistema"],
+              ["", t("common.systemMic")],
               ...devices.map((d): [string, string] => [d, d]),
             ]}
           />
         </Row>
-        <Row label={testing ? <LevelMeter /> : "Prova il microfono"}>
-          <Button onClick={toggleTest}>{testing ? "Ferma" : "Prova"}</Button>
+        <Row label={testing ? <LevelMeter /> : t("general.testMic")}>
+          <Button onClick={toggleTest}>
+            {testing ? t("common.stop") : t("common.test")}
+          </Button>
         </Row>
       </Group>
 
-      <Group title="Sistema">
-        <Row label="Apri all'accesso">
+      <Group title={t("general.system")}>
+        <Row label={t("general.autostart")}>
           <Toggle
-            label="Apri all'accesso"
+            label={t("general.autostart")}
             checked={autostart}
             onChange={async (v) => {
               try {
@@ -119,21 +152,21 @@ export default function General() {
           />
         </Row>
         <Row
-          label="Ripristina gli appunti dopo l'incolla"
-          hint="Rimette negli appunti quello che c'era prima del dettato."
+          label={t("general.restoreClipboard")}
+          hint={t("general.restoreClipboardHint")}
         >
           <Toggle
-            label="Ripristina gli appunti"
+            label={t("general.restoreClipboard")}
             checked={settings.restore_clipboard}
             onChange={(restore_clipboard) => save({ restore_clipboard })}
           />
         </Row>
-        <Row label="Conserva la cronologia per">
+        <Row label={t("general.retention")}>
           <Select
-            label="Conserva la cronologia per"
+            label={t("general.retention")}
             value={String(settings.retention_days)}
             onChange={(v) => save({ retention_days: Number(v) })}
-            options={RETENTION}
+            options={retention}
           />
         </Row>
       </Group>

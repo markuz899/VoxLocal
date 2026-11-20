@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, errorText, type ProviderView } from "../api";
 import { useSettings } from "../App";
 import { formatMs } from "../format";
+import { useT } from "../i18n";
 import {
   Button,
   Group,
@@ -12,17 +13,8 @@ import {
   TextInput,
 } from "../ui";
 
-function keyState(p: ProviderView): { text: string; tone: string } {
-  if (p.kind === "cli")
-    return { text: "Abbonamento tramite CLI", tone: "text-muted" };
-  if (!p.needs_key)
-    return { text: "In locale, nessuna chiave", tone: "text-muted" };
-  return p.has_key
-    ? { text: "Chiave salvata", tone: "text-ok" }
-    : { text: "Chiave mancante", tone: "text-warn" };
-}
-
 export default function Providers() {
+  const t = useT();
   const { settings, update } = useSettings();
   const [providers, setProviders] = useState<ProviderView[]>([]);
   const [open, setOpen] = useState<string | null>(null);
@@ -32,28 +24,34 @@ export default function Providers() {
     reload();
   }, []);
 
+  const keyState = (p: ProviderView): { text: string; tone: string } => {
+    if (p.kind === "cli")
+      return { text: t("providers.cli"), tone: "text-muted" };
+    if (!p.needs_key) return { text: t("providers.local"), tone: "text-muted" };
+    return p.has_key
+      ? { text: t("providers.keySaved"), tone: "text-ok" }
+      : { text: t("providers.keyMissing"), tone: "text-warn" };
+  };
+
   const usable = providers.filter((p) => p.kind !== "none");
 
   return (
     <>
       <PageTitle
-        title="Provider LLM"
-        description="Il provider che riscrive il testo nelle modalità Pulito, Email e simili. Le chiavi restano nel portachiavi del sistema."
+        title={t("providers.title")}
+        description={t("providers.description")}
       />
       <Group>
-        <Row
-          label="Provider predefinito"
-          hint="Usato dalle modalità che non ne indicano uno."
-        >
+        <Row label={t("providers.default")} hint={t("providers.defaultHint")}>
           <Select
-            label="Provider predefinito"
+            label={t("providers.default")}
             value={settings.default_llm}
             onChange={(default_llm) => update({ default_llm })}
             options={usable.map((p): [string, string] => [p.id, p.label])}
           />
         </Row>
       </Group>
-      <Group title="Provider">
+      <Group title={t("providers.list")}>
         {usable.map((p) =>
           open === p.id ? (
             <ProviderEditor
@@ -71,7 +69,7 @@ export default function Providers() {
               }
             >
               <Button variant="ghost" onClick={() => setOpen(p.id)}>
-                Configura
+                {t("providers.configure")}
               </Button>
             </Row>
           ),
@@ -90,6 +88,8 @@ function ProviderEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const t = useT();
+  const { settings } = useSettings();
   const [baseUrl, setBaseUrl] = useState(provider.base_url);
   const [model, setModel] = useState(provider.model);
   const [key, setKey] = useState("");
@@ -118,7 +118,7 @@ function ProviderEditor({
         await api.setApiKey(provider.id, key);
         setKey("");
       }
-      return "Salvato.";
+      return t("common.saved");
     });
 
   const isCli = provider.kind === "cli";
@@ -128,13 +128,13 @@ function ProviderEditor({
       <div className="flex items-center justify-between">
         <span className="font-medium">{provider.label}</span>
         <Button variant="ghost" onClick={onClose}>
-          Chiudi
+          {t("common.close")}
         </Button>
       </div>
       {!isCli && (
         <label className="block">
           <span className="mb-1 block text-[12px] text-muted">
-            Indirizzo API
+            {t("providers.apiUrl")}
           </span>
           <TextInput
             className="w-full"
@@ -144,18 +144,22 @@ function ProviderEditor({
         </label>
       )}
       <label className="block">
-        <span className="mb-1 block text-[12px] text-muted">Modello</span>
+        <span className="mb-1 block text-[12px] text-muted">
+          {t("modes.model")}
+        </span>
         <TextInput
           className="w-full"
           value={model}
-          placeholder={isCli ? "quello predefinito del CLI" : ""}
+          placeholder={isCli ? t("providers.cliModel") : ""}
           onChange={(e) => setModel(e.target.value)}
         />
       </label>
       {provider.needs_key && (
         <label className="block">
           <span className="mb-1 block text-[12px] text-muted">
-            {provider.has_key ? "Sostituisci la chiave API" : "Chiave API"}
+            {provider.has_key
+              ? t("providers.replaceKey")
+              : t("providers.apiKey")}
           </span>
           <TextInput
             className="w-full"
@@ -163,7 +167,9 @@ function ProviderEditor({
             autoComplete="off"
             value={key}
             placeholder={
-              provider.has_key ? "salvata nel portachiavi" : "incolla la chiave"
+              provider.has_key
+                ? t("providers.keyStored")
+                : t("providers.pasteKey")
             }
             onChange={(e) => setKey(e.target.value)}
           />
@@ -171,17 +177,21 @@ function ProviderEditor({
       )}
       <div className="flex flex-wrap items-center gap-2 pt-1">
         <Button variant="primary" onClick={save}>
-          Salva
+          {t("common.save")}
         </Button>
         <Button
           onClick={() =>
-            act(
-              async () =>
-                `Raggiungibile in ${formatMs(await api.checkProvider(provider.id))}.`,
+            act(async () =>
+              t("providers.reachable", {
+                ms: formatMs(
+                  await api.checkProvider(provider.id),
+                  settings.ui_language,
+                ),
+              }),
             )
           }
         >
-          Verifica
+          {t("providers.verify")}
         </Button>
         {provider.has_key && (
           <Button
@@ -189,11 +199,11 @@ function ProviderEditor({
             onClick={() =>
               act(async () => {
                 await api.deleteApiKey(provider.id);
-                return "Chiave rimossa.";
+                return t("providers.keyRemoved");
               })
             }
           >
-            Rimuovi chiave
+            {t("providers.removeKey")}
           </Button>
         )}
       </div>

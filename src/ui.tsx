@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { events } from "./api";
 import { formatHotkey, hotkeyFromEvent } from "./format";
+import { useT } from "./i18n";
 
 export function PageTitle({
   title,
@@ -245,6 +246,7 @@ export function HotkeyInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const t = useT();
   const [recording, setRecording] = useState(false);
   const ref = useRef<HTMLButtonElement>(null);
 
@@ -278,7 +280,7 @@ export function HotkeyInput({
           : "border-line bg-surface"
       }`}
     >
-      {recording ? "Premi i tasti…" : formatHotkey(value)}
+      {recording ? t("common.pressKeys") : formatHotkey(value)}
     </button>
   );
 }

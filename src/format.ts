@@ -43,54 +43,84 @@ export function hotkeyFromEvent(e: KeyboardEvent): string | null {
   return [...mods, code].join("+");
 }
 
-export const LANGUAGES: [string, string][] = [
-  ["auto", "Rileva automaticamente"],
-  ["it", "Italiano"],
-  ["en", "Inglese"],
-  ["es", "Spagnolo"],
-  ["fr", "Francese"],
-  ["de", "Tedesco"],
-  ["pt", "Portoghese"],
-  ["nl", "Olandese"],
-  ["pl", "Polacco"],
-  ["ro", "Rumeno"],
-  ["el", "Greco"],
-  ["sv", "Svedese"],
-  ["da", "Danese"],
-  ["no", "Norvegese"],
-  ["fi", "Finlandese"],
-  ["cs", "Ceco"],
-  ["hu", "Ungherese"],
-  ["uk", "Ucraino"],
-  ["ru", "Russo"],
-  ["tr", "Turco"],
-  ["ar", "Arabo"],
-  ["hi", "Hindi"],
-  ["zh", "Cinese"],
-  ["ja", "Giapponese"],
-  ["ko", "Coreano"],
+// Codici delle lingue che whisper riconosce bene; i nomi li dà Intl nella lingua dell'interfaccia.
+const LANGUAGE_CODES = [
+  "it",
+  "en",
+  "es",
+  "fr",
+  "de",
+  "pt",
+  "nl",
+  "pl",
+  "ro",
+  "el",
+  "sv",
+  "da",
+  "no",
+  "fi",
+  "cs",
+  "hu",
+  "uk",
+  "ru",
+  "tr",
+  "ar",
+  "hi",
+  "zh",
+  "ja",
+  "ko",
 ];
 
-export function formatBytes(n: number): string {
+export function languageName(code: string, uiLang: string): string {
+  try {
+    const name =
+      new Intl.DisplayNames([uiLang], { type: "language" }).of(code) ?? code;
+    return name.charAt(0).toLocaleUpperCase(uiLang) + name.slice(1);
+  } catch {
+    return code;
+  }
+}
+
+/** Opzioni per una select di lingue; con `auto` aggiunge "Rileva automaticamente" in testa. */
+export function languageOptions(
+  uiLang: string,
+  auto = false,
+): [string, string][] {
+  const list = LANGUAGE_CODES.map((c): [string, string] => [
+    c,
+    languageName(c, uiLang),
+  ]);
+  return auto
+    ? [
+        [
+          "auto",
+          uiLang === "it" ? "Rileva automaticamente" : "Detect automatically",
+        ],
+        ...list,
+      ]
+    : list;
+}
+
+const locale = (uiLang: string) => (uiLang === "it" ? "it-IT" : "en-GB");
+
+export function formatBytes(n: number, uiLang = "en"): string {
   if (n >= 1e9)
-    return `${(n / 1e9).toLocaleString("it-IT", { maximumFractionDigits: 1 })} GB`;
+    return `${(n / 1e9).toLocaleString(locale(uiLang), { maximumFractionDigits: 1 })} GB`;
   return `${Math.round(n / 1e6)} MB`;
 }
 
-const dateFmt = new Intl.DateTimeFormat("it-IT", {
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-export function formatDate(ms: number): string {
-  return dateFmt.format(new Date(ms));
+export function formatDate(ms: number, uiLang = "en"): string {
+  return new Intl.DateTimeFormat(locale(uiLang), {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(ms));
 }
 
-export function formatMs(ms: number | null): string {
+export function formatMs(ms: number | null, uiLang = "en"): string {
   if (ms == null) return "–";
   return ms < 1000
     ? `${ms} ms`
-    : `${(ms / 1000).toLocaleString("it-IT", { maximumFractionDigits: 1 })} s`;
+    : `${(ms / 1000).toLocaleString(locale(uiLang), { maximumFractionDigits: 1 })} s`;
 }

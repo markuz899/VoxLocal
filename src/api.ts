@@ -26,6 +26,9 @@ export interface Settings {
   onboarded: boolean;
   check_updates: boolean;
   app_modes: AppMode[];
+  ui_language: string;
+  command_hotkey: string;
+  translate_to: string;
 }
 
 export interface AppMode {
@@ -95,6 +98,8 @@ export interface HistoryItem {
   total_ms: number | null;
   target_app: string | null;
   audio_device: string | null;
+  /** Il comando vocale, per i comandi sulla selezione (raw_text è allora la selezione). */
+  command: string | null;
 }
 
 export interface HistoryFilter {
@@ -155,6 +160,8 @@ export const api = {
   listModes: () => invoke<Mode[]>("list_modes"),
   updateMode: (mode: Omit<Mode, "id">) => invoke<void>("update_mode", { mode }),
   createMode: (name: string) => invoke<string>("create_mode", { name }),
+  createModeWithTask: (name: string, task: string) =>
+    invoke<string>("create_mode_with_task", { name, task }),
   deleteMode: (slug: string) => invoke<void>("delete_mode", { slug }),
   resetMode: (slug: string) => invoke<void>("reset_mode", { slug }),
   getVocabulary: () => invoke<string[]>("get_vocabulary"),

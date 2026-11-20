@@ -14,6 +14,8 @@ import Providers from "./pages/Providers";
 import Vocabulary from "./pages/Vocabulary";
 import History from "./pages/History";
 import About from "./pages/About";
+import Faq from "./pages/Faq";
+import { translate, useT } from "./i18n";
 
 interface SettingsCtx {
   settings: Settings;
@@ -30,13 +32,14 @@ export function useSettings(): SettingsCtx {
 }
 
 const SECTIONS = [
-  { id: "general", label: "Generale", page: General },
-  { id: "transcription", label: "Trascrizione", page: Transcription },
-  { id: "modes", label: "Modalità", page: Modes },
-  { id: "providers", label: "Provider LLM", page: Providers },
-  { id: "vocabulary", label: "Vocabolario", page: Vocabulary },
-  { id: "history", label: "Cronologia", page: History },
-  { id: "about", label: "Informazioni", page: About },
+  { id: "general", label: "nav.general", page: General },
+  { id: "transcription", label: "nav.transcription", page: Transcription },
+  { id: "modes", label: "nav.modes", page: Modes },
+  { id: "providers", label: "nav.providers", page: Providers },
+  { id: "vocabulary", label: "nav.vocabulary", page: Vocabulary },
+  { id: "history", label: "nav.history", page: History },
+  { id: "faq", label: "nav.faq", page: Faq },
+  { id: "about", label: "nav.about", page: About },
 ] as const;
 
 function currentSection(): string {
@@ -64,7 +67,7 @@ export default function App() {
 
   const update = useCallback(
     async (patch: Partial<Settings>) => {
-      if (!settings) return "impostazioni non ancora caricate";
+      if (!settings) return "settings not loaded yet";
       try {
         setSettings(await api.saveSettings({ ...settings, ...patch }));
         return null;
@@ -78,7 +81,7 @@ export default function App() {
   if (loadError) {
     return (
       <p className="p-8 text-rec">
-        Impossibile leggere le impostazioni: {loadError}
+        {translate("en", "app.loadError", { error: loadError })}
       </p>
     );
   }
@@ -102,12 +105,13 @@ export default function App() {
 }
 
 function Shell({ section }: { section: string }) {
+  const t = useT();
   const active = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0];
   const Page = active.page;
   return (
     <div className="flex h-full">
       <nav
-        aria-label="Sezioni"
+        aria-label={t("nav.sections")}
         className="flex w-52 shrink-0 flex-col gap-0.5 border-r border-line px-3 pt-6"
       >
         <div className="mb-5 px-2 text-[15px] font-semibold">VoxLocal</div>
@@ -122,7 +126,7 @@ function Shell({ section }: { section: string }) {
                 : "hover:bg-surface"
             }`}
           >
-            {s.label}
+            {t(s.label)}
           </a>
         ))}
       </nav>

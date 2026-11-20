@@ -73,6 +73,7 @@ export default function History() {
     app: string | null;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const filter = useMemo<HistoryFilter>(() => {
     const starts = periodStarts();
@@ -102,6 +103,27 @@ export default function History() {
     },
     [filter],
   );
+
+  const remove = async (id: number) => {
+    try {
+      await api.deleteDictation(id);
+      if (selected === id) setSelected(null);
+      await load(0);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+
+  const clearAll = async () => {
+    try {
+      await api.clearHistory();
+      setConfirmClear(false);
+      setSelected(null);
+      await load(0);
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
 
   // Ricerca mentre si scrive, con un piccolo ritardo.
   useEffect(() => {
@@ -134,6 +156,24 @@ export default function History() {
         <h1 className="mr-auto text-[22px] font-semibold tracking-tight">
           Cronologia
         </h1>
+        {confirmClear ? (
+          <span className="flex items-center gap-2">
+            <Button variant="danger" onClick={clearAll}>
+              Elimina {facets?.total ?? ""} dettati
+            </Button>
+            <Button variant="ghost" onClick={() => setConfirmClear(false)}>
+              Annulla
+            </Button>
+          </span>
+        ) : (
+          <Button
+            variant="ghost"
+            disabled={!facets?.total}
+            onClick={() => setConfirmClear(true)}
+          >
+            Svuota la cronologia
+          </Button>
+        )}
         <div
           role="group"
           aria-label="Periodo"
@@ -221,16 +261,17 @@ export default function History() {
               </li>
             )}
             {items.map((item) => (
-              <li key={item.id}>
+              <li
+                key={item.id}
+                className={`group relative border-b border-line ${
+                  item.id === selected ? "bg-cobalt-soft/60" : "hover:bg-paper"
+                }`}
+              >
                 <button
                   type="button"
                   onClick={() => setSelected(item.id)}
                   aria-current={item.id === selected ? "true" : undefined}
-                  className={`flex w-full items-center gap-3 border-b border-line px-3 py-2.5 text-left ${
-                    item.id === selected
-                      ? "bg-cobalt-soft/60"
-                      : "hover:bg-paper"
-                  }`}
+                  className="flex w-full items-center gap-3 px-3 py-2.5 pr-11 text-left"
                 >
                   <AppBadge app={item.target_app} />
                   <div className="min-w-0 flex-1">
@@ -256,6 +297,7 @@ export default function History() {
                     {STATUS[item.status]}
                   </span>
                 </button>
+                <RowDelete onDelete={() => remove(item.id)} />
               </li>
             ))}
             {more && (
@@ -283,6 +325,43 @@ export default function History() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Cestino sulla riga: compare al passaggio o con la tastiera; il primo clic chiede conferma. */
+function RowDelete({ onDelete }: { onDelete: () => void }) {
+  const [armed, setArmed] = useState(false);
+  return (
+    <button
+      type="button"
+      aria-label={armed ? "Conferma: elimina il dettato" : "Elimina il dettato"}
+      title={armed ? "Clic di nuovo per eliminare" : "Elimina"}
+      onClick={() => (armed ? onDelete() : setArmed(true))}
+      onBlur={() => setArmed(false)}
+      className={`absolute top-1/2 right-2 grid h-7 -translate-y-1/2 place-items-center rounded-md px-1.5 text-[12px] transition-opacity focus-visible:opacity-100 ${
+        armed
+          ? "bg-rec text-white opacity-100"
+          : "text-muted opacity-0 group-hover:opacity-100 hover:bg-line hover:text-ink"
+      }`}
+    >
+      {armed ? (
+        "Elimina"
+      ) : (
+        <svg
+          viewBox="0 0 16 16"
+          width="15"
+          height="15"
+          aria-hidden="true"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M2.5 4.5h11M6.5 4.5V3h3v1.5M4 4.5l.7 8.5h6.6l.7-8.5M6.8 7v4M9.2 7v4" />
+        </svg>
+      )}
+    </button>
   );
 }
 

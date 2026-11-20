@@ -55,6 +55,7 @@ fn oa(id: &str, label: &str, base_url: &str, model: &str, needs_key: bool) -> Pr
     }
 }
 
+#[cfg(feature = "subscription-cli")]
 fn cli(id: &str, label: &str, command: &[&str], model: &str) -> ProviderConfig {
     ProviderConfig {
         id: id.into(),
@@ -69,7 +70,8 @@ fn cli(id: &str, label: &str, command: &[&str], model: &str) -> ProviderConfig {
 /// Preset precompilati. I nomi dei modelli invecchiano: si cambiano in `settings.json`
 /// (voce `providers`) senza toccare il codice.
 pub fn presets() -> Vec<ProviderConfig> {
-    vec![
+    #[allow(unused_mut)]
+    let mut v = vec![
         ProviderConfig {
             id: NONE_ID.into(),
             label: "Nessuno (testo grezzo)".into(),
@@ -164,7 +166,10 @@ pub fn presets() -> Vec<ProviderConfig> {
             needs_key: true,
             ..Default::default()
         },
-        // Abbonamenti via CLI ufficiale. Flag misurati il 2026-11-20 (DECISIONS D22).
+    ];
+    // Abbonamenti via CLI ufficiale, solo nelle build personali. Flag misurati il 2026-11-20 (D22).
+    #[cfg(feature = "subscription-cli")]
+    v.extend([
         ProviderConfig {
             system_flag: Some("--system-prompt".into()),
             model_flag: Some("--model".into()),
@@ -205,7 +210,8 @@ pub fn presets() -> Vec<ProviderConfig> {
                 "",
             )
         },
-    ]
+    ]);
+    v
 }
 
 /// Provider per id: prima le personalizzazioni dell'utente, poi i preset.
@@ -260,6 +266,12 @@ pub fn build(cfg: &ProviderConfig) -> Result<Option<Arc<dyn LlmProvider>>> {
             base_url: cfg.base_url.clone(),
             api_key: need_key()?,
         }),
+        // Blocca anche i provider cli aggiunti a mano in settings.json.
+        ProviderKind::Cli if !cfg!(feature = "subscription-cli") => {
+            return Err(LlmError::Cli(
+                "i provider via CLI non sono disponibili in questa build".into(),
+            ))
+        }
         ProviderKind::Cli => Arc::new(CliProvider {
             id: cfg.id.clone(),
             command: cfg.command.clone(),

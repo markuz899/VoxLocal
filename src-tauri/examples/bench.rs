@@ -14,15 +14,19 @@ async fn main() -> Result<()> {
     let mut model = "base".to_string();
     let mut lang: Option<String> = None;
     let mut runs = 3usize;
+    let mut min_ctx: Option<i32> = None;
     let mut files: Vec<PathBuf> = vec![];
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
             "--model" => model = args.next().context("--model vuole un valore")?,
             "--lang" => lang = args.next().filter(|l| l != "auto"),
+            "--min-ctx" => {
+                min_ctx = Some(args.next().context("--min-ctx vuole un valore")?.parse()?)
+            }
             "--runs" => runs = args.next().context("--runs vuole un valore")?.parse()?,
             "-h" | "--help" => {
-                println!("bench [--model ID] [--lang it|en|auto] [--runs N] [file.wav …]");
+                println!("bench [--model ID] [--lang it|en|auto] [--runs N] [--min-ctx FRAME, 0 = 30 s fissi] [file.wav …]");
                 println!(
                     "modelli: {}",
                     models::MODELS
@@ -64,6 +68,9 @@ async fn main() -> Result<()> {
 
     whisper_rs::install_logging_hooks();
     let whisper = LocalWhisper::new(models::path(info), None);
+    if let Some(m) = min_ctx {
+        whisper.set_min_ctx(m);
+    }
     let load_ms = whisper.preload()?;
     println!("modello {model}  caricamento {load_ms} ms  run per file {runs}\n");
     println!(

@@ -24,6 +24,7 @@ cd .. && pnpm format:check && pnpm build      # tsc + vite
 cd src-tauri
 cargo run --release --example bench -- --model base            # tutti i WAV in fixtures/
 cargo run --release --example bench -- --model base --lang it --runs 5 ../fixtures/it_alice_48k.wav
+cargo run --release --example bench -- --model large-v3-turbo-q5_0 --min-ctx 0   # finestra fissa di 30 s, per confronto
 ```
 
 Il primo avvio scarica il modello in `~/Library/Application Support/app.voxlocal.desktop/models/` e ne verifica lo SHA-256. Anche la prima esecuzione dopo una build compila gli shader Metal, quindi il caricamento richiede circa 10 s; dalla seconda in poi circa 0,2 s.
@@ -45,6 +46,8 @@ Log: `~/Library/Logs/app.voxlocal.desktop/VoxLocal.log`. Ogni dettato scrive una
 `dettato ok: audio=… resample=… stt=… paste=… totale=…`.
 
 ## Fase 3 — LLM, modalità, chiavi
+
+I provider in abbonamento (Claude Code, Codex) esistono solo nella build personale: `pnpm dev:personal`.
 
 Sottocomandi del binario (in dev: `src-tauri/target/debug/voxlocal`):
 
@@ -79,7 +82,8 @@ Misure del 2026-11-20 (`voxlocal check`, modalità Pulito, frase di 18 parole):
 |---|---|---|
 | `.app` / DMG compresso (senza modelli) | < 15 MB | 7,7 MB / 3,9 MB |
 | RAM a riposo, modello non caricato | < 80 MB | 37,8 MB RSS (nessuna finestra webview aperta) |
-| STT `base`, ~10 s di audio, modello caldo | < 1,5 s fine parlato → incolla | 0,49 s (jfk 11 s), 0,61 s (it 8,4 s); resample < 20 ms |
+| STT `base`, ~10 s di audio, modello caldo | < 1,5 s fine parlato → incolla | 0,30 s (it 8,4 s) con flash attention + contesto proporzionale |
+| STT `large-v3-turbo-q5_0` (default Apple Silicon) | — | 0,6-0,9 s per 1-8 s di parlato, 2,4 s per 21 s; picco RAM 469 MB |
 | Avvio a freddo fino al tray | < 1 s | 485 ms il primo avvio, ~115 ms i successivi |
 
 Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log alla voce `totale=`. Va misurato con la prova manuale, perché da qui non posso premere la scorciatoia (vedi il report della Fase 2).

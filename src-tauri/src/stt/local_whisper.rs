@@ -22,6 +22,8 @@ struct Inner {
     model_path: Mutex<PathBuf>,
     ctx: Mutex<Option<(Arc<WhisperContext>, Instant)>>,
     keep_warm: Mutex<Option<Duration>>,
+    /// Contesto minimo dell'encoder in frame (0 = sempre 1500, cioè 30 s).
+    min_ctx: std::sync::atomic::AtomicI32,
 }
 
 impl LocalWhisper {
@@ -32,6 +34,7 @@ impl LocalWhisper {
                 model_path: Mutex::new(model_path),
                 ctx: Mutex::new(None),
                 keep_warm: Mutex::new(keep_warm),
+                min_ctx: std::sync::atomic::AtomicI32::new(DEFAULT_MIN_CTX),
             }),
         }
     }
@@ -39,6 +42,13 @@ impl LocalWhisper {
     pub fn set_model(&self, path: PathBuf) {
         *self.inner.model_path.lock().unwrap() = path;
         self.unload();
+    }
+
+    /// Contesto minimo dell'encoder in frame (50 al secondo); 0 = finestra fissa di 30 s.
+    pub fn set_min_ctx(&self, frames: i32) {
+        self.inner
+            .min_ctx
+            .store(frames, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn set_keep_warm(&self, keep_warm: Option<Duration>) {
@@ -86,9 +96,12 @@ impl LocalWhisper {
             bail!("modello non trovato: {}", path.display());
         }
         let t = Instant::now();
+        // Flash attention: encoder più veloce su Metal/CPU, nessuna perdita di qualità.
+        let mut cp = WhisperContextParameters::default();
+        cp.flash_attn(true);
         let ctx = WhisperContext::new_with_params(
             path.to_str().ok_or_else(|| anyhow!("percorso non UTF-8"))?,
-            WhisperContextParameters::default(),
+            cp,
         )
         .map_err(|e| anyhow!("caricamento modello fallito: {e}"))?;
         log::info!("modello {} caricato in {:?}", path.display(), t.elapsed());
@@ -119,6 +132,13 @@ impl LocalWhisper {
         }
         p.set_no_context(true);
         p.set_no_timestamps(true);
+        let min_ctx = self
+            .inner
+            .min_ctx
+            .load(std::sync::atomic::Ordering::Relaxed);
+        if min_ctx > 0 {
+            p.set_audio_ctx(audio_ctx(audio.samples.len(), min_ctx));
+        }
         p.set_print_special(false);
         p.set_print_progress(false);
         p.set_print_realtime(false);
@@ -158,6 +178,17 @@ impl LocalWhisper {
         Ok(Transcript { text, language })
     }
 }
+
+/// Whisper elabora sempre 30 s (1500 frame dell'encoder, 50 al secondo) anche per 2 s di parlato.
+/// Riducendo il contesto alla durata reale + margine il costo scende in proporzione.
+// Sotto ~10 s di contesto turbo entra in loop di ripetizione (misurato con 256 frame): minimo 512.
+// ponytail: margine fisso di 2 s; se compaiono troncamenti sul finale, alzarlo o usare set_min_ctx(0)
+fn audio_ctx(samples: usize, min_ctx: i32) -> i32 {
+    let secs = samples as f32 / WHISPER_RATE as f32;
+    (((secs + 2.0) * 50.0).ceil() as i32).clamp(min_ctx.min(1500), 1500)
+}
+
+const DEFAULT_MIN_CTX: i32 = 512;
 
 unsafe extern "C" fn abort_if_cancelled(user_data: *mut c_void) -> bool {
     (*(user_data as *const CancellationToken)).is_cancelled()

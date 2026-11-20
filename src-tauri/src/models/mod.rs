@@ -104,11 +104,16 @@ pub fn find(id: &str) -> Option<&'static ModelInfo> {
     MODELS.iter().find(|m| m.id == id)
 }
 
-/// Default suggerito per l'hardware. Bench su M1 8 GB, 10 s di audio: base ≈ 0,5 s,
-/// small-q5_1 ≈ 1,4 s (e peggiore sull'italiano), quindi base ovunque.
-// ponytail: niente rilevamento RAM/GPU; large-v3-turbo-q5_0 come proposta per macchine ≥16 GB arriva con l'onboarding
+/// Default suggerito per l'hardware (DECISIONS D27). Su M1 8 GB, con flash attention e
+/// contesto proporzionale, large-v3-turbo-q5_0 trascrive 2-8 s di parlato in 0,6-0,9 s ed è
+/// l'unico che regge la voce reale in italiano; base sbaglia ("una e meia" per "un'email").
+// ponytail: su CPU (Intel/Windows) turbo non è misurato; resta base finché il bench in CI non dice altro
 pub fn recommended() -> &'static str {
-    "base"
+    if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        "large-v3-turbo-q5_0"
+    } else {
+        "base"
+    }
 }
 
 /// Stessa cartella di `app_data_dir()` di Tauri, così bench e app condividono i modelli.

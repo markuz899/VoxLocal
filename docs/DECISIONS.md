@@ -74,7 +74,7 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 ## D18 — Bench come `example`, non `[[bin]]`
 - **Perché:** Tauri impacchetta nell'app *tutti* i binari del crate, e il bench aggiungeva 4 MB al bundle. Si lancia con `cargo run --release --example bench`.
 
-## D19 — Modello di default `base` ovunque
+## D19 — Modello di default `base` ovunque — superata da D27
 - **Misura su M1 8 GB, ~10 s di audio:** `base` impiega circa 0,5 s; `small-q5_1` circa 1,4 s ed è anche peggiore sull'italiano di prova. Proporre modelli più grandi in base alla RAM è rimandato all'onboarding (Fase 4).
 
 ## D20 — `anyhow` al posto degli enum `thiserror` per modulo (per ora) — superata in Fase 3 per l'LLM (`LlmError`)
@@ -109,6 +109,19 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 
 ## D26 — Temperatura `f64`
 - Un `f32` 0.2 serializzato in JSON diventa `0.20000000298…`; l'ha scoperto il test wiremock.
+
+## D27 — Default `large-v3-turbo-q5_0` su Apple Silicon, flash attention, contesto proporzionale
+- **Il problema:** una prova reale di Marco con `base` ("inviamo una email a giorgio…") ha dato "Inviamo nemmeno il A giorgio… graverchità". La voce sintetica del bench nascondeva il limite: `base` non regge la voce reale in italiano.
+- **Flash attention** (`WhisperContextParameters::flash_attn`): turbo passa da 2,8 a 2,1 s, nessuna perdita.
+- **`audio_ctx` proporzionale alla durata più 2 s**, al posto della finestra fissa di 30 s: turbo su 8,4 s di audio passa da 2,1 a 0,86 s.
+  - Con un minimo di 256 frame turbo entra in loop di ripetizione su frasi di 2 s; con **512** no (verificato su 1, 2, 8, 21 s, in italiano e inglese).
+- **Misure finali su M1:** 2-8 s di parlato in 0,6-0,9 s, 21 s in 2,4 s. RAM con il modello caricato 469 MB, contro 296 MB di base; viene liberata dopo `keep_warm`.
+- **Altre piattaforme:** su Intel/Windows (CPU) resta `base` finché non c'è un bench in CI.
+- Sostituisce D19.
+
+## D28 — Provider in abbonamento solo nelle build personali
+- Feature cargo `subscription-cli`, disattivata di default: la build commerciale non contiene i preset `claude-cli`/`codex-cli` e rifiuta anche i provider `cli` aggiunti a mano in `settings.json`.
+- **Build personale:** `pnpm dev:personal` / `pnpm build:personal`.
 
 ## Rischi principali (in ordine)
 

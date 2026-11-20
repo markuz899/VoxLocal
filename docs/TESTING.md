@@ -123,6 +123,16 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] `pnpm test` (confronto fra testo detto e scritto) e `cargo test --lib` (filtri, conteggi, regole).
 - [ ] Rilevamento dell'app su un desktop vero: `cargo test --lib frontmost -- --ignored --nocapture`.
 
+## Lingua, comando sulla selezione, libreria, traduzione
+
+- [ ] Generale → Lingua dell'interfaccia: passando da English a Italiano cambiano subito finestra, menu del tray e overlay del dettato successivo.
+- [ ] **Comando sulla selezione:** seleziona una frase in TextEdit, Mail, Slack e Chrome, tieni ⌥⇧Space e di' "rendilo più formale". La selezione viene sostituita e dopo un ⌘V torna quello che c'era negli appunti.
+- [ ] Comando senza selezione: arriva la notifica "Select some text first" e gli appunti restano come prima.
+- [ ] Comando con Ollama spento: notifica, selezione intatta, cronologia con stato Errore.
+- [ ] Nella cronologia un comando mostra "Command: …" e le parti cambiate rispetto alla selezione.
+- [ ] Modalità → Aggiungi dalla libreria: la modalità aggiunta compare nell'elenco e nel tray; il pulsante diventa "Added".
+- [ ] Generale → Traduci in: Tedesco. Con la modalità Translate, un dettato in italiano esce in tedesco.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

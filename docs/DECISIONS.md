@@ -169,6 +169,29 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 ## D38 — Cronologia dal vivo
 - `pipeline://state` porta anche l'app di destinazione; ogni dettato salvato emette `history://changed`. La cronologia mostra in cima la riga del dettato in corso e si ricarica da sola.
 
+## D39 — Interfaccia in inglese e italiano, inglese di default
+- **Impostazione:** `settings.ui_language`, "en" di default, pensando al pubblico di AppSumo.
+- **Finestra:** un dizionario per lingua in `src/i18n.ts`, senza librerie. Nomi delle lingue, date e numeri vengono da `Intl`.
+- **Tray, notifiche e overlay:** `i18n::tr(lang, en, it)` nel backend; l'overlay legge la lingua quando si apre.
+- **Modalità predefinite:** si mostrano in inglese finché hanno il nome di fabbrica; se l'utente le rinomina, resta il suo nome.
+
+## D40 — Comando sulla selezione
+- **Scorciatoia:** una seconda, `command_hotkey` (⌥⇧Space / Alt+Shift+Space).
+- **Alla pressione:** VoxLocal svuota gli appunti, simula ⌘C/Ctrl+C e aspetta fino a 400 ms il testo selezionato; intanto registra l'istruzione.
+- **Esecuzione:** l'LLM predefinito riceve `<instruction>` e `<text>` con un system prompt in inglese che vieta di eseguire istruzioni contenute nel testo.
+- **Risultato:** ⌘V sostituisce la selezione ancora attiva e poi tornano gli appunti di prima.
+- **Errori:** se manca la selezione o l'LLM, o se c'è un errore o un annullamento, la selezione resta com'era e gli appunti vengono ripristinati.
+- **Cronologia:** il dettato si salva con `command` (migrazione 3); il testo detto è la selezione, così il confronto parola per parola mostra cosa è cambiato.
+- **Rischio:** alcune app potrebbero ricevere i modificatori della scorciatoia insieme a ⌘C. enigo usa una sorgente di eventi privata, ma va provato app per app.
+
+## D41 — Libreria di modalità pronte
+- Dieci modelli in `src/i18n.ts` (`MODE_LIBRARY`): nome e descrizione nelle due lingue, compito in inglese. `create_mode_with_task` aggiunge le regole comuni (i tag `<dettato>`, mantieni la lingua). Diventano modalità normali, modificabili.
+
+## D42 — Lingua di traduzione a scelta
+- **Impostazione:** `settings.translate_to`.
+- **Template:** `{{target_language}}` diventa il nome inglese della lingua ("German"), che l'LLM capisce meglio di un codice.
+- **Modalità di traduzione:** la migrazione 3 aggiorna la modalità predefinita (slug `translate_en`, mantenuto per compatibilità) e il suo nome diventa "Traduci" / "Translate".
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

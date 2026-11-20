@@ -21,9 +21,12 @@ scorciatoia ─► microfono ─► 16 kHz ─► whisper.cpp ─► [LLM opzion
 6. **Cronologia.** Ogni dettato finisce in SQLite locale con l'app in cui è stato incollato, testo grezzo e finale, tempi di ogni fase e stato.
    - La finestra Cronologia ha l'elenco filtrabile per periodo, modalità e app; a destra il dettaglio, dove le parti riscritte dall'AI sono sottolineate e mostrano cosa avevi detto.
    - Il dettato in corso compare dal vivo in cima all'elenco.
-7. **Modalità per app.** Le regole del tipo "Slack usa Messaggio" o "Mail usa Email" scelgono la modalità in base all'app in primo piano quando parte il dettato.
+7. **Comando sulla selezione.** Selezioni un testo in qualsiasi app, tieni premuto ⌥⇧Space e dici cosa farne ("rendilo più formale", "traducilo in tedesco"): VoxLocal lo sostituisce con il risultato dell'LLM.
+8. **Modalità per app.** Le regole del tipo "Slack usa Messaggio" o "Mail usa Email" scelgono la modalità in base all'app in primo piano quando parte il dettato.
 
 ### Provider LLM
+
+Le modalità pronte della libreria (post LinkedIn, risposta a un cliente, verbale, prompt per un assistente AI, riassunto…) si aggiungono con un clic. La modalità di traduzione usa la lingua scelta nelle impostazioni. L'interfaccia è in inglese (default) e italiano, con una scheda FAQ.
 
 Un solo client compatibile con le API di OpenAI copre OpenAI, Groq, OpenRouter, Together, Mistral, DeepSeek, Ollama, LM Studio e llama.cpp server. Anthropic e Gemini hanno client nativi; "Nessuno" incolla la trascrizione grezza. Aggiungere un provider vuol dire un file in `src-tauri/src/llm/` più una riga nel registry.
 

@@ -14,13 +14,15 @@ Ogni domanda ha un **default**: se non arriva una risposta, procedo con quello.
 | Q8 | Linux senza Secret Service | Errore esplicito, nessun salvataggio in chiaro. Le chiavi si possono passare per variabile d'ambiente (`VOXLOCAL_<PROVIDER>_KEY`), lette solo dal backend. |
 | Q9 | Firma macOS | Serve un **Developer ID Application** (non Apple Development) per notarizzare. Lo gestiamo in Fase 5; in dev firmo con Apple Development. |
 | Q10 | Endpoint e chiavi dell'updater | Release su GitHub (`latest.json`) e coppia di chiavi minisign generata in Fase 5. Repo GitHub da definire. |
-| Q11 | Lingua della UI | Italiano e inglese, con i18n minimale (un JSON per lingua, niente libreria). |
+| Q11 | Lingua della UI | Per ora **solo italiano**, con i testi raccolti nei componenti. L'inglese serve prima della vendita fuori dall'Italia: estrarre le stringhe in un JSON per lingua, senza libreria. |
 | Q12 | PATH della shell | Rust e cmake universal sono installati, ma `~/.zshrc` non è aggiornato (vedi sotto). Gli script di build impostano il PATH da soli. |
 | Q13 | DMG con layout grafico | `bundle_dmg.sh` di Tauri pilota il Finder via AppleScript e qui va in timeout (manca il permesso Automazione). In locale creo il DMG con `hdiutil`; in CI (Fase 5) il problema non si pone. |
 | Q14 | ✅ Decisa: esclusi dalla build commerciale (D28). Provider CLI in abbonamento in un prodotto distribuito | Per uso personale va bene. Se VoxLocal si vende, Anthropic richiede un'approvazione per offrire l'uso dell'abbonamento claude.ai; i termini di OpenAI/Codex sono da verificare. Default: il provider resta, documentato come "usa il CLI che hai installato tu". |
 | Q15 | Provider LLM predefinito | `ollama` (locale, coerente con "locale di default"). La modalità attiva di default è però **Grezzo**, quindi nessun LLM finché l'utente non sceglie una modalità. |
 | Q16 | Nomi dei modelli nei preset | Invecchiano (gpt-5-mini, llama-3.3…). Si cambiano in `settings.json` → `providers`, senza ricompilare. In Fase 4 l'elenco arriverà da `list_models`. |
 | Q17 | Portachiavi e binari diversi | Una chiave salvata dal binario di dev (`target/debug/voxlocal`) fa comparire il prompt "consenti accesso" alla `.app` di release. Basta scegliere "Consenti sempre"; con la firma Developer ID (Fase 5) il problema si riduce. |
+| Q18 | L'overlay "non focalizzabile" funziona davvero? | `focusable(false)` più click-through. Va verificato a mano che, con l'overlay visibile, ⌘V arrivi all'app di destinazione (TextEdit, Slack, browser). Piano B: NSPanel non attivante (DECISIONS D7). |
+| Q19 | Microfono scelto e poi scollegato | Si ripiega sul microfono di sistema, con un avviso nel log. Dopo la vendita: notificarlo. |
 
 ## Da fare a mano (Marco)
 

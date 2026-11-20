@@ -123,6 +123,25 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - Feature cargo `subscription-cli`, disattivata di default: la build commerciale non contiene i preset `claude-cli`/`codex-cli` e rifiuta anche i provider `cli` aggiunti a mano in `settings.json`.
 - **Build personale:** `pnpm dev:personal` / `pnpm build:personal`.
 
+## D29 — Overlay creato al primo dettato e distrutto dopo 30 s di inattività
+- **Misura con l'overlay sempre vivo (build release):** RSS 77 MB per l'app, più tre processi WebKit (contenuto 32, rete 14, GPU 22 MB), circa 145 MB in totale contro un target di 80 MB.
+- **Con l'overlay creato al bisogno:** a riposo l'app ha RSS 43 MB e footprint 17 MB, senza processi WebKit.
+- **Costo:** il primo dettato dopo una pausa mostra la pillola circa 200 ms più tardi. La registrazione parte comunque subito; la pillola nasce già nello stato "In ascolto" per non lampeggiare.
+- Sostituisce la scelta "creata nascosta all'avvio" di ARCHITECTURE §10.
+
+## D30 — `macOSPrivateApi` attivo per la trasparenza dell'overlay
+- Tauri richiede l'API privata per le finestre trasparenti su macOS. Conseguenza: niente Mac App Store, quindi la distribuzione diretta resta con Developer ID e notarizzazione (Fase 5).
+
+## D31 — Il menu del tray si ricostruisce a ogni cambio
+- `tray::refresh` rifà il menu da zero quando cambiano impostazioni o modalità, da qualunque parte arrivi il cambio (tray, finestra, sottocomandi). Niente stato duplicato fra spunte e impostazioni.
+- Tutte le modifiche passano da `Pipeline::apply_settings`: un solo punto per gli effetti collaterali (registrazione della scorciatoia, cambio di modello, keep-warm, salvataggio, evento `settings://changed`).
+
+## D32 — UI senza librerie di componenti
+- **Cosa c'è:** React + Tailwind v4, con una decina di componenti scritti a mano (`src/ui.tsx`) e i font di sistema.
+- **Perché i font di sistema:** l'app deve sembrare nativa, la CSP non ammette font remoti e il bundle resta piccolo.
+- **Overlay:** TypeScript puro (0,7 KB di JS).
+- **Elemento distintivo:** il misuratore a barre, lo stesso nell'overlay, nella prova del microfono e nell'onboarding.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

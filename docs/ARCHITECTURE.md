@@ -224,7 +224,7 @@ L'onboarding controlla ogni permesso, mostra lo stato e ricontrolla a intervalli
 
 - **overlay:**
   - Finestra separata da 220×56 px, trasparente, senza decorazioni, `always_on_top`, `focus: false`, `skip_taskbar`. Su macOS ha il livello "floating panel" e `visibleOnAllWorkspaces`.
-  - Non deve mai rubare il focus all'app di destinazione, altrimenti l'incolla finisce nell'overlay. Si crea all'avvio nascosta: costa poco e appare in < 16 ms.
+  - Non deve mai rubare il focus all'app di destinazione, altrimenti l'incolla finisce nell'overlay. Si crea al primo dettato e si distrugge dopo 30 s di inattività (DECISIONS D29).
   - **Esc:** l'overlay non ha il focus, quindi Esc è un'altra scorciatoia globale, registrata solo durante Recording, Transcribing e PostProcessing e rimossa subito dopo.
 - **settings:** si crea su richiesta dal tray e si **distrugge** alla chiusura, non si nasconde. Questo libera la RAM del webview ed è necessario per stare sotto gli 80 MB a riposo.
 - Su macOS l'app non compare nel Dock (`ActivationPolicy::Accessory`): si usa dal tray.

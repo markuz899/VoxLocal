@@ -76,12 +76,37 @@ Misure del 2026-11-20 (`voxlocal check`, modalità Pulito, frase di 18 parole):
 | claude-cli (Haiku, abbonamento) | 2,2 s |
 | codex-cli (abbonamento) | 4,9 s |
 
+## Fase 4 — Interfaccia
+
+Al primo avvio si apre l'onboarding. Per rivederlo: Impostazioni → Informazioni → "riapri la guida". Per ripartire da zero, cancella `settings.json` in `~/Library/Application Support/app.voxlocal.desktop/`.
+
+Checklist manuale:
+- [ ] **Onboarding:**
+  - [ ] il microfono mostra le barre che si muovono;
+  - [ ] il passo Accessibilità si aggiorna da solo dopo aver dato il permesso;
+  - [ ] il modello si scarica con la barra di avanzamento;
+  - [ ] il dettato di prova finisce nel riquadro;
+  - [ ] "Inizia a usare VoxLocal" chiude l'onboarding.
+- [ ] **Overlay:** compare in basso al centro mentre detti, con le barre che seguono la voce. Mostra "Trascrivo" ed "Elaboro" con l'onda, poi sparisce. **Il testo deve finire nell'app di destinazione, non nell'overlay** (Q18).
+- [ ] **Esc** durante l'overlay annulla.
+- [ ] **Generale:**
+  - [ ] cambiare scorciatoia: la nuova funziona subito, la vecchia no;
+  - [ ] il misuratore della prova del microfono si muove;
+  - [ ] l'interruttore "Apri all'accesso" sopravvive a un riavvio dell'app.
+- [ ] **Trascrizione:** scaricare, usare ed eliminare un modello (quello in uso non si può eliminare).
+- [ ] **Modalità:** modificare e salvare; "Ripristina originale"; creare ed eliminare una modalità personalizzata. Il menu del tray si aggiorna da solo.
+- [ ] **Provider:** salvare una chiave (poi `voxlocal providers` deve dire "chiave ✓"); con "Verifica" compare la latenza; rimuovere la chiave.
+- [ ] **Cronologia:** la ricerca trova anche parole senza accento ("perche" trova "perché"); "Mostra originale" sui dettati elaborati; "Svuota" chiede conferma nella pagina.
+- [ ] Chiudere la finestra non chiude l'app; riaprire VoxLocal (doppio clic) porta davanti le impostazioni.
+
+L'anteprima della UI fuori da Tauri si fa con `mockIPC` di `@tauri-apps/api/mocks` (pagina temporanea, non nel repo).
+
 ## Metriche misurate
 
 | Metrica | Target | Fase 2 (M1 8 GB, macOS 14.0) |
 |---|---|---|
-| `.app` / DMG compresso (senza modelli) | < 15 MB | 7,7 MB / 3,9 MB |
-| RAM a riposo, modello non caricato | < 80 MB | 37,8 MB RSS (nessuna finestra webview aperta) |
+| `.app` / DMG compresso (senza modelli) | < 15 MB | Fase 4: 9,1 MB / 4,7 MB |
+| RAM a riposo, modello non caricato | < 80 MB | Fase 4: RSS 43 MB, footprint 17 MB, nessun processo WebKit (overlay creato al bisogno, D29) |
 | STT `base`, ~10 s di audio, modello caldo | < 1,5 s fine parlato → incolla | 0,30 s (it 8,4 s) con flash attention + contesto proporzionale |
 | STT `large-v3-turbo-q5_0` (default Apple Silicon) | — | 0,6-0,9 s per 1-8 s di parlato, 2,4 s per 21 s; picco RAM 469 MB |
 | Avvio a freddo fino al tray | < 1 s | 485 ms il primo avvio, ~115 ms i successivi |

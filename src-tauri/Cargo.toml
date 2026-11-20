@@ -65,6 +65,9 @@ whisper-rs = { version = "=0.16.0", features = ["metal", "log_backend"] }
 objc2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSString"] }
 
+[target."cfg(windows)".dependencies]
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
+
 [dev-dependencies]
 tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }
 wiremock = "0.6.5"

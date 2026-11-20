@@ -1,6 +1,7 @@
 pub mod audio;
 pub mod cli;
 mod commands;
+mod context;
 pub mod llm;
 pub mod models;
 mod overlay;
@@ -120,6 +121,7 @@ pub fn run() {
             commands::add_term,
             commands::remove_term,
             commands::get_history,
+            commands::history_facets,
             commands::delete_dictation,
             commands::clear_history,
             commands::copy_text,

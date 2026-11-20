@@ -12,7 +12,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::llm::registry::{self, ProviderConfig, ProviderKind};
 use crate::pipeline::Pipeline;
 use crate::settings::{secrets, Settings};
-use crate::storage::{HistoryItem, Mode, ModeUpdate};
+use crate::storage::{HistoryFacets, HistoryFilter, HistoryItem, Mode, ModeUpdate};
 use crate::{audio, models, permissions};
 
 type P<'a> = State<'a, Arc<Pipeline>>;
@@ -213,10 +213,20 @@ pub fn remove_term(p: P, term: String) -> R<()> {
 }
 
 #[tauri::command]
-pub fn get_history(p: P, query: String, limit: usize, offset: usize) -> R<Vec<HistoryItem>> {
+pub fn get_history(
+    p: P,
+    filter: HistoryFilter,
+    limit: usize,
+    offset: usize,
+) -> R<Vec<HistoryItem>> {
     p.storage
-        .history(&query, limit.min(200), offset)
+        .history(&filter, limit.min(200), offset)
         .map_err(err)
+}
+
+#[tauri::command]
+pub fn history_facets(p: P, today: i64, week: i64) -> R<HistoryFacets> {
+    p.storage.history_facets(today, week).map_err(err)
 }
 
 #[tauri::command]

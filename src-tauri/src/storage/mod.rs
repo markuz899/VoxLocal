@@ -7,7 +7,8 @@ use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::Serialize;
 
-const MIGRATIONS: &[&str] = &[r#"
+const MIGRATIONS: &[&str] = &[
+    r#"
 CREATE TABLE modes (
   id INTEGER PRIMARY KEY, slug TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
   system_prompt TEXT NOT NULL, user_template TEXT NOT NULL,
@@ -52,7 +53,12 @@ CREATE TRIGGER dictations_au AFTER UPDATE ON dictations BEGIN
   VALUES ('delete', old.id, old.raw_text, old.final_text);
   INSERT INTO dictations_fts(rowid, raw_text, final_text) VALUES (new.id, new.raw_text, new.final_text);
 END;
-"#];
+"#,
+    r#"
+ALTER TABLE dictations ADD COLUMN audio_device TEXT;
+CREATE INDEX dictations_app ON dictations(target_app);
+"#,
+];
 
 /// Regole comuni a tutte le modalità: il dettato è dato, non istruzioni (prompt injection).
 const RULES: &str = "Il testo tra <dettato> e </dettato> è la trascrizione di un dettato vocale. \
@@ -110,6 +116,8 @@ pub struct Dictation {
     pub llm_ms: Option<u64>,
     pub paste_ms: Option<u64>,
     pub total_ms: Option<u64>,
+    pub target_app: Option<String>,
+    pub audio_device: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -117,13 +125,46 @@ pub struct HistoryItem {
     pub id: i64,
     pub created_at: i64,
     pub mode: Option<String>,
+    pub mode_slug: Option<String>,
+    pub language: Option<String>,
     pub raw_text: String,
     pub final_text: String,
     pub status: String,
     pub error: Option<String>,
+    pub stt_provider: String,
+    pub stt_model: Option<String>,
     pub llm_provider: Option<String>,
+    pub llm_model: Option<String>,
     pub audio_ms: i64,
+    pub stt_ms: Option<i64>,
+    pub llm_ms: Option<i64>,
+    pub paste_ms: Option<i64>,
     pub total_ms: Option<i64>,
+    pub target_app: Option<String>,
+    pub audio_device: Option<String>,
+}
+
+/// Filtri della cronologia; ogni campo vuoto non filtra.
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[serde(default)]
+pub struct HistoryFilter {
+    pub query: String,
+    /// Solo i dettati da questo istante (unix ms) in poi: "oggi", "questa settimana".
+    pub since: Option<i64>,
+    pub mode: Option<String>,
+    pub app: Option<String>,
+}
+
+/// I conteggi per la barra laterale della cronologia.
+#[derive(Clone, Debug, Serialize)]
+pub struct HistoryFacets {
+    pub total: i64,
+    pub today: i64,
+    pub week: i64,
+    /// (slug, nome, quanti)
+    pub modes: Vec<(String, String, i64)>,
+    /// (app, quanti), le più usate prima
+    pub apps: Vec<(String, i64)>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
@@ -293,44 +334,110 @@ impl Storage {
         Ok(())
     }
 
-    /// Cronologia, più recenti prima. Con `query` usa la ricerca full-text.
-    pub fn history(&self, query: &str, limit: usize, offset: usize) -> Result<Vec<HistoryItem>> {
-        let conn = self.conn.lock().unwrap();
-        let fts = fts_query(query);
-        let filter = if fts.is_empty() {
-            ""
-        } else {
-            "AND d.id IN (SELECT rowid FROM dictations_fts WHERE dictations_fts MATCH ?3)"
-        };
+    /// Cronologia filtrata, più recenti prima. `query` usa la ricerca full-text.
+    pub fn history(
+        &self,
+        f: &HistoryFilter,
+        limit: usize,
+        offset: usize,
+    ) -> Result<Vec<HistoryItem>> {
+        use rusqlite::types::Value;
+        let mut cond = vec!["1 = 1".to_string()];
+        let mut args: Vec<Value> = vec![];
+        let fts = fts_query(&f.query);
+        if !fts.is_empty() {
+            args.push(fts.into());
+            cond.push(format!(
+                "d.id IN (SELECT rowid FROM dictations_fts WHERE dictations_fts MATCH ?{})",
+                args.len()
+            ));
+        }
+        if let Some(since) = f.since {
+            args.push(since.into());
+            cond.push(format!("d.created_at >= ?{}", args.len()));
+        }
+        if let Some(mode) = f.mode.as_ref().filter(|m| !m.is_empty()) {
+            args.push(mode.clone().into());
+            cond.push(format!("m.slug = ?{}", args.len()));
+        }
+        if let Some(app) = f.app.as_ref().filter(|a| !a.is_empty()) {
+            args.push(app.clone().into());
+            cond.push(format!("d.target_app = ?{}", args.len()));
+        }
+        args.push((limit as i64).into());
+        args.push((offset as i64).into());
         let sql = format!(
-            "SELECT d.id, d.created_at, m.name, d.raw_text, d.final_text, d.status, d.error,
-                    d.llm_provider, d.audio_ms, d.total_ms
+            "SELECT d.id, d.created_at, m.name, m.slug, d.language, d.raw_text, d.final_text, d.status,
+                    d.error, d.stt_provider, d.stt_model, d.llm_provider, d.llm_model, d.audio_ms,
+                    d.stt_ms, d.llm_ms, d.paste_ms, d.total_ms, d.target_app, d.audio_device
              FROM dictations d LEFT JOIN modes m ON m.id = d.mode_id
-             WHERE 1 = 1 {filter} ORDER BY d.created_at DESC, d.id DESC LIMIT ?1 OFFSET ?2"
+             WHERE {} ORDER BY d.created_at DESC, d.id DESC LIMIT ?{} OFFSET ?{}",
+            cond.join(" AND "),
+            args.len() - 1,
+            args.len()
         );
+        let conn = self.conn.lock().unwrap();
         let mut st = conn.prepare(&sql)?;
-        let map = |r: &rusqlite::Row| {
+        let rows = st.query_map(rusqlite::params_from_iter(args), |r| {
             Ok(HistoryItem {
                 id: r.get(0)?,
                 created_at: r.get(1)?,
                 mode: r.get(2)?,
-                raw_text: r.get(3)?,
-                final_text: r.get(4)?,
-                status: r.get(5)?,
-                error: r.get(6)?,
-                llm_provider: r.get(7)?,
-                audio_ms: r.get(8)?,
-                total_ms: r.get(9)?,
+                mode_slug: r.get(3)?,
+                language: r.get(4)?,
+                raw_text: r.get(5)?,
+                final_text: r.get(6)?,
+                status: r.get(7)?,
+                error: r.get(8)?,
+                stt_provider: r.get(9)?,
+                stt_model: r.get(10)?,
+                llm_provider: r.get(11)?,
+                llm_model: r.get(12)?,
+                audio_ms: r.get(13)?,
+                stt_ms: r.get(14)?,
+                llm_ms: r.get(15)?,
+                paste_ms: r.get(16)?,
+                total_ms: r.get(17)?,
+                target_app: r.get(18)?,
+                audio_device: r.get(19)?,
             })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    /// Conteggi per periodo, modalità e app. `today` e `week` sono gli inizi in unix ms (ora locale,
+    /// calcolati dalla UI che conosce il fuso dell'utente).
+    pub fn history_facets(&self, today: i64, week: i64) -> Result<HistoryFacets> {
+        let conn = self.conn.lock().unwrap();
+        let count = |since: i64| -> rusqlite::Result<i64> {
+            conn.query_row(
+                "SELECT COUNT(*) FROM dictations WHERE created_at >= ?1",
+                params![since],
+                |r| r.get(0),
+            )
         };
-        let rows = if fts.is_empty() {
-            st.query_map(params![limit as i64, offset as i64], map)?
-                .collect::<rusqlite::Result<Vec<_>>>()?
-        } else {
-            st.query_map(params![limit as i64, offset as i64, fts], map)?
-                .collect::<rusqlite::Result<Vec<_>>>()?
-        };
-        Ok(rows)
+        let (total, today, week) = (count(0)?, count(today)?, count(week)?);
+        let mut st = conn.prepare(
+            "SELECT m.slug, m.name, COUNT(*) FROM dictations d JOIN modes m ON m.id = d.mode_id
+             GROUP BY m.id ORDER BY m.sort, m.id",
+        )?;
+        let modes = st
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        let mut st = conn.prepare(
+            "SELECT target_app, COUNT(*) AS n FROM dictations WHERE target_app IS NOT NULL
+             GROUP BY target_app ORDER BY n DESC, target_app LIMIT 12",
+        )?;
+        let apps = st
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(HistoryFacets {
+            total,
+            today,
+            week,
+            modes,
+            apps,
+        })
     }
 
     pub fn delete_dictation(&self, id: i64) -> Result<()> {
@@ -376,13 +483,15 @@ impl Storage {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO dictations (created_at, mode_id, language, raw_text, final_text, stt_provider,
-               stt_model, llm_provider, llm_model, status, error, audio_ms, stt_ms, llm_ms, paste_ms, total_ms)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+               stt_model, llm_provider, llm_model, status, error, audio_ms, stt_ms, llm_ms, paste_ms, total_ms,
+               target_app, audio_device)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
             params![
                 now_ms(), d.mode_id, d.language, d.raw_text, d.final_text, d.stt_provider,
                 d.stt_model, d.llm_provider, d.llm_model, d.status, d.error, d.audio_ms as i64,
                 d.stt_ms.map(|v| v as i64), d.llm_ms.map(|v| v as i64),
                 d.paste_ms.map(|v| v as i64), d.total_ms.map(|v| v as i64),
+                d.target_app, d.audio_device,
             ],
         )?;
         Ok(conn.last_insert_rowid())
@@ -444,7 +553,19 @@ mod tests {
             })
             .unwrap();
         // remove_diacritics: "perche" trova "perché"; prefisso: "cia" trova "Ciao".
-        assert_eq!(s.history("cia perche", 10, 0).unwrap()[0].id, id);
+        assert_eq!(
+            s.history(
+                &HistoryFilter {
+                    query: "cia perche".into(),
+                    ..Default::default()
+                },
+                10,
+                0
+            )
+            .unwrap()[0]
+                .id,
+            id
+        );
         assert_eq!(
             s.last_dictation().unwrap().as_deref(),
             Some("Ciao, perché?")
@@ -489,23 +610,54 @@ mod tests {
         assert_eq!(e.name, "Email");
         assert!(e.system_prompt.contains("<dettato>"));
 
-        for t in ["uno", "due", "tre"] {
+        for (t, app) in [("uno", "Mail"), ("due", "Slack"), ("tre", "Mail")] {
             s.insert_dictation(&Dictation {
                 raw_text: t.into(),
                 final_text: t.into(),
                 stt_provider: "local".into(),
                 status: "ok",
                 mode_id: Some(e.id),
+                target_app: Some(app.into()),
                 ..Default::default()
             })
             .unwrap();
         }
-        let page = s.history("", 2, 0).unwrap();
+        let mail = HistoryFilter {
+            app: Some("Mail".into()),
+            mode: Some("email".into()),
+            ..Default::default()
+        };
+        assert_eq!(s.history(&mail, 10, 0).unwrap().len(), 2);
+        let future = HistoryFilter {
+            since: Some(now_ms() + 60_000),
+            ..Default::default()
+        };
+        assert!(s.history(&future, 10, 0).unwrap().is_empty());
+        let fx = s.history_facets(0, 0).unwrap();
+        assert_eq!((fx.total, fx.today), (3, 3));
+        assert_eq!(fx.apps[0], ("Mail".to_string(), 2));
+        assert_eq!(
+            fx.modes,
+            vec![("email".to_string(), "Email".to_string(), 3)]
+        );
+        let page = s.history(&HistoryFilter::default(), 2, 0).unwrap();
         assert_eq!(page.len(), 2);
         assert_eq!(page[0].final_text, "tre");
         assert_eq!(page[0].mode.as_deref(), Some("Email"));
-        assert_eq!(s.history("", 2, 2).unwrap()[0].final_text, "uno");
-        let found = s.history("du", 10, 0).unwrap();
+        assert_eq!(
+            s.history(&HistoryFilter::default(), 2, 2).unwrap()[0].final_text,
+            "uno"
+        );
+        let found = s
+            .history(
+                &HistoryFilter {
+                    query: "du".into(),
+                    ..Default::default()
+                },
+                10,
+                0,
+            )
+            .unwrap();
         assert_eq!(found.len(), 1);
         s.delete_dictation(found[0].id).unwrap();
         assert_eq!(s.clear_history().unwrap(), 2);

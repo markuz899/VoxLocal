@@ -50,6 +50,16 @@ pub struct Settings {
     pub onboarded: bool,
     /// Controllo automatico degli aggiornamenti (all'avvio e ogni 6 ore).
     pub check_updates: bool,
+    /// Regole "app → modalità": vincono sulla modalità attiva quando il dettato parte in quell'app.
+    pub app_modes: Vec<AppMode>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AppMode {
+    /// Nome (o parte del nome) dell'app, senza distinzione di maiuscole: "Slack", "Mail".
+    pub app: String,
+    /// Slug della modalità (tabella `modes`).
+    pub mode: String,
 }
 
 impl Default for Settings {
@@ -74,6 +84,7 @@ impl Default for Settings {
             audio_device: None,
             onboarded: false,
             check_updates: true,
+            app_modes: vec![],
         }
     }
 }

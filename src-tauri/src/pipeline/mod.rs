@@ -51,6 +51,8 @@ struct ModelDone {
 #[derive(Clone, Serialize)]
 struct StateEvent {
     state: State,
+    /// L'app di destinazione del dettato in corso (per la riga dal vivo della cronologia).
+    app: Option<String>,
 }
 
 pub struct Pipeline {
@@ -68,6 +70,9 @@ struct Inner {
     recorder: Option<Recorder>,
     cancel: CancellationToken,
     generation: u64,
+    /// L'app in primo piano quando il dettato è partito, e il microfono usato.
+    target_app: Option<String>,
+    audio_device: Option<String>,
 }
 
 impl Pipeline {
@@ -83,6 +88,8 @@ impl Pipeline {
                 recorder: None,
                 cancel: CancellationToken::new(),
                 generation: 0,
+                target_app: None,
+                audio_device: None,
             }),
             downloading: AtomicBool::new(false),
             mic_test: Mutex::new(None),
@@ -146,7 +153,9 @@ impl Pipeline {
 
         let app = self.app.clone();
         let device = self.settings.lock().unwrap().audio_device.clone();
-        let rec = match Recorder::start(device, move |level| {
+        // Prima di aprire il microfono: dopo, su macOS, il focus resta comunque all'app di destinazione.
+        let target_app = crate::context::frontmost_app();
+        let rec = match Recorder::start(device.clone(), move |level| {
             let _ = app.emit("audio://level", level);
         }) {
             Ok(r) => r,
@@ -158,6 +167,8 @@ impl Pipeline {
             inner.recorder = Some(rec);
             inner.cancel = CancellationToken::new();
             inner.generation += 1;
+            inner.target_app = target_app;
+            inner.audio_device = device;
             (inner.generation, self.settings.lock().unwrap().max_seconds)
         };
         self.set_state(State::Recording);
@@ -178,15 +189,16 @@ impl Pipeline {
 
     fn finish(self: &Arc<Self>) {
         let released = Instant::now();
-        let (rec, cancel) = {
+        let (rec, cancel, target) = {
             let mut inner = self.inner.lock().unwrap();
-            (inner.recorder.take(), inner.cancel.clone())
+            let target = (inner.target_app.clone(), inner.audio_device.clone());
+            (inner.recorder.take(), inner.cancel.clone(), target)
         };
         let Some(rec) = rec else { return };
         self.set_state(State::Transcribing);
         let me = self.clone();
         tauri::async_runtime::spawn(async move {
-            if let Err(e) = me.run(rec, &cancel, released).await {
+            if let Err(e) = me.run(rec, &cancel, released, target).await {
                 if !cancel.is_cancelled() {
                     log::error!("dettato fallito: {e:#}");
                     me.notify(&format!("Dettato non riuscito: {e:#}"));
@@ -203,6 +215,7 @@ impl Pipeline {
         rec: Recorder,
         cancel: &CancellationToken,
         released: Instant,
+        (target_app, audio_device): (Option<String>, Option<String>),
     ) -> Result<()> {
         let raw = tokio::task::spawn_blocking(move || rec.stop()).await??;
         let audio_ms = raw.duration_ms();
@@ -238,11 +251,19 @@ impl Pipeline {
             status: "ok",
             audio_ms,
             stt_ms: Some(stt_ms),
+            target_app: target_app.clone(),
+            audio_device,
             ..Default::default()
         };
+        // Una regola "app → modalità" vince sulla modalità scelta nel menu.
+        let mode_slug = target_app
+            .as_deref()
+            .and_then(|app| crate::context::mode_for_app(app, &settings.app_modes))
+            .unwrap_or(&settings.active_mode)
+            .to_string();
 
         // Post-processing LLM: qualunque errore → si incolla il testo grezzo (mai perdere il dettato).
-        if let Some(mode) = self.storage.mode(&settings.active_mode).ok().flatten() {
+        if let Some(mode) = self.storage.mode(&mode_slug).ok().flatten() {
             d.mode_id = Some(mode.id);
             let provider = mode
                 .provider_id
@@ -325,8 +346,11 @@ impl Pipeline {
     }
 
     fn save(&self, d: &Dictation) {
-        if let Err(e) = self.storage.insert_dictation(d) {
-            log::error!("salvataggio in cronologia fallito: {e:#}");
+        match self.storage.insert_dictation(d) {
+            Ok(id) => {
+                let _ = self.app.emit("history://changed", id);
+            }
+            Err(e) => log::error!("salvataggio in cronologia fallito: {e:#}"),
         }
     }
 
@@ -429,11 +453,17 @@ impl Pipeline {
     }
 
     fn set_state(&self, state: State) {
-        let prev = std::mem::replace(&mut self.inner.lock().unwrap().state, state);
+        let (prev, app) = {
+            let mut inner = self.inner.lock().unwrap();
+            (
+                std::mem::replace(&mut inner.state, state),
+                inner.target_app.clone(),
+            )
+        };
         if prev == state {
             return;
         }
-        let _ = self.app.emit("pipeline://state", StateEvent { state });
+        let _ = self.app.emit("pipeline://state", StateEvent { state, app });
         tray::show_state(&self.app, state);
         overlay::show_state(&self.app, state);
         // Esc globale solo mentre serve (DECISIONS D7). Fuori dal lock: register tocca il main thread.

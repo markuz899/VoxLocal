@@ -48,6 +48,8 @@ pub struct Settings {
     pub audio_device: Option<String>,
     /// false finché l'onboarding non è completato.
     pub onboarded: bool,
+    /// Controllo automatico degli aggiornamenti (all'avvio e ogni 6 ore).
+    pub check_updates: bool,
 }
 
 impl Default for Settings {
@@ -71,6 +73,7 @@ impl Default for Settings {
             retention_days: 90,
             audio_device: None,
             onboarded: false,
+            check_updates: true,
         }
     }
 }

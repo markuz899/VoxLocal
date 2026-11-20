@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
-import { api, type AppInfo } from "../api";
-import { Group, PageTitle, Row } from "../ui";
+import { api, errorText, type AppInfo } from "../api";
+import { useSettings } from "../App";
+import { Button, Group, Notice, PageTitle, Row, Toggle } from "../ui";
 
 export default function About() {
+  const { settings, update } = useSettings();
   const [info, setInfo] = useState<AppInfo | null>(null);
+  const [notice, setNotice] = useState<{
+    text: string;
+    tone: "ok" | "error" | "info";
+  } | null>(null);
   useEffect(() => {
     api.appInfo().then(setInfo);
   }, []);
@@ -28,6 +34,68 @@ export default function About() {
           hint={<span className="selectable">{info.log_dir}</span>}
         />
       </Group>
+      <Group title="Aggiornamenti">
+        <Row
+          label={
+            info.pending_update
+              ? `È disponibile la versione ${info.pending_update}`
+              : "Cerca aggiornamenti automaticamente"
+          }
+          hint={
+            info.pending_update
+              ? "VoxLocal si riavvia dopo l'installazione."
+              : "All'avvio e ogni 6 ore. Gli aggiornamenti sono firmati."
+          }
+        >
+          {info.pending_update ? (
+            <Button
+              variant="primary"
+              onClick={async () => {
+                setNotice({ text: "Scarico e installo…", tone: "info" });
+                try {
+                  await api.installUpdate();
+                } catch (e) {
+                  setNotice({ text: errorText(e), tone: "error" });
+                }
+              }}
+            >
+              Installa e riavvia
+            </Button>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  setNotice({ text: "Controllo…", tone: "info" });
+                  try {
+                    const v = await api.checkUpdate();
+                    setNotice(
+                      v
+                        ? { text: `Trovata la versione ${v}.`, tone: "ok" }
+                        : { text: "Hai già l'ultima versione.", tone: "ok" },
+                    );
+                    setInfo(await api.appInfo());
+                  } catch (e) {
+                    setNotice({ text: errorText(e), tone: "error" });
+                  }
+                }}
+              >
+                Cerca ora
+              </Button>
+              <Toggle
+                label="Cerca aggiornamenti automaticamente"
+                checked={settings.check_updates}
+                onChange={(check_updates) => update({ check_updates })}
+              />
+            </>
+          )}
+        </Row>
+      </Group>
+      {notice && (
+        <div className="-mt-4 mb-6 px-1">
+          <Notice tone={notice.tone} text={notice.text} />
+        </div>
+      )}
       <Group title="Privacy">
         <Row
           label="Nessuna telemetria"

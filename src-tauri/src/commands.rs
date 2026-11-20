@@ -277,9 +277,25 @@ pub fn finish_onboarding(p: P) -> R<()> {
     p.apply_settings(s).map_err(|e| format!("{e:#}"))
 }
 
+/// Cerca un aggiornamento adesso. `None` = già all'ultima versione.
+#[tauri::command]
+pub async fn check_update(app: AppHandle) -> R<Option<String>> {
+    crate::updater::check(&app)
+        .await
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub async fn install_update(app: AppHandle) -> R<()> {
+    crate::updater::install(&app)
+        .await
+        .map_err(|e| format!("{e:#}"))
+}
+
 #[derive(Serialize)]
 pub struct AppInfo {
-    version: &'static str,
+    version: String,
+    pending_update: Option<String>,
     data_dir: String,
     log_dir: String,
     personal_build: bool,
@@ -290,7 +306,8 @@ pub struct AppInfo {
 pub fn app_info(app: AppHandle) -> AppInfo {
     use tauri::Manager;
     AppInfo {
-        version: env!("CARGO_PKG_VERSION"),
+        version: app.package_info().version.to_string(),
+        pending_update: crate::updater::pending_version(&app),
         data_dir: crate::data_dir().display().to_string(),
         log_dir: app
             .path()

@@ -24,6 +24,7 @@ export interface Settings {
   retention_days: number;
   audio_device: string | null;
   onboarded: boolean;
+  check_updates: boolean;
 }
 
 export type ProviderKind =
@@ -90,6 +91,7 @@ export interface PermissionStatus {
 
 export interface AppInfo {
   version: string;
+  pending_update: string | null;
   data_dir: string;
   log_dir: string;
   personal_build: boolean;
@@ -140,6 +142,8 @@ export const api = {
     invoke<void>("set_autostart", { enabled }),
   finishOnboarding: () => invoke<void>("finish_onboarding"),
   appInfo: () => invoke<AppInfo>("app_info"),
+  checkUpdate: () => invoke<string | null>("check_update"),
+  installUpdate: () => invoke<void>("install_update"),
 };
 
 export const events = {

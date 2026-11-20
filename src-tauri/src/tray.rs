@@ -107,6 +107,22 @@ fn menu(app: &AppHandle, pipeline: &Pipeline) -> tauri::Result<Menu<Wry>> {
     )?;
 
     let status = MenuItem::with_id(app, "status", "Pronto", false, None::<&str>)?;
+    let update = match crate::updater::pending_version(app) {
+        Some(v) => MenuItem::with_id(
+            app,
+            "update",
+            format!("Installa VoxLocal {v} e riavvia"),
+            true,
+            None::<&str>,
+        )?,
+        None => MenuItem::with_id(
+            app,
+            "check-update",
+            "Cerca aggiornamenti",
+            true,
+            None::<&str>,
+        )?,
+    };
     let menu = Menu::with_items(
         app,
         &[
@@ -122,6 +138,7 @@ fn menu(app: &AppHandle, pipeline: &Pipeline) -> tauri::Result<Menu<Wry>> {
             &MenuItem::with_id(app, "repaste", "Copia l'ultimo dettato", true, None::<&str>)?,
             &MenuItem::with_id(app, "history", "Cronologia…", true, None::<&str>)?,
             &MenuItem::with_id(app, "open", "Impostazioni…", true, Some("CmdOrCtrl+,"))?,
+            &update,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "quit", "Esci da VoxLocal", true, Some("CmdOrCtrl+Q"))?,
         ],
@@ -162,6 +179,24 @@ fn on_menu(app: &AppHandle, id: &str) {
         "quit" => return app.exit(0),
         "open" => return crate::open_main(app, None),
         "history" => return crate::open_main(app, Some("history")),
+        "check-update" | "update" => {
+            let app = app.clone();
+            let install = id == "update";
+            tauri::async_runtime::spawn(async move {
+                let res = if install {
+                    crate::updater::install(&app).await.map(|_| None)
+                } else {
+                    crate::updater::check(&app).await
+                };
+                let p = app.state::<Arc<Pipeline>>();
+                match res {
+                    Ok(Some(v)) => p.notify(&format!("È disponibile VoxLocal {v}.")),
+                    Ok(None) => set_status(&app, "VoxLocal è aggiornato"),
+                    Err(e) => p.notify(&format!("Aggiornamento non riuscito: {e:#}")),
+                }
+            });
+            return;
+        }
         "repaste" => {
             if let Ok(Some(text)) = pipeline.storage.last_dictation() {
                 let _ = crate::paste::set_clipboard(&text);

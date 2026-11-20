@@ -11,6 +11,7 @@ pub mod settings;
 pub mod storage;
 pub mod stt;
 mod tray;
+mod updater;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -94,6 +95,8 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(updater::Pending::default())
         .invoke_handler(tauri::generate_handler![
             commands::get_settings,
             commands::save_settings,
@@ -128,6 +131,8 @@ pub fn run() {
             commands::set_autostart,
             commands::finish_onboarding,
             commands::app_info,
+            commands::check_update,
+            commands::install_update,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -169,6 +174,7 @@ pub fn run() {
                     stt.release_if_idle();
                 }
             });
+            updater::spawn_background_checks(handle.clone());
             log::info!("VoxLocal pronto, scorciatoia {}", settings.hotkey);
             Ok(())
         })

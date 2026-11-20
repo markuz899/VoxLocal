@@ -48,8 +48,9 @@ pub struct Recorder {
 }
 
 impl Recorder {
-    /// Apre il microfono di default. `on_level` riceve l'RMS ~30 volte al secondo.
-    pub fn start(on_level: impl Fn(f32) + Send + 'static) -> Result<Self> {
+    /// Apre il microfono indicato (per nome) o quello di default se manca o non esiste più.
+    /// `on_level` riceve l'RMS ~30 volte al secondo.
+    pub fn start(device: Option<String>, on_level: impl Fn(f32) + Send + 'static) -> Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
         let (ready_tx, ready_rx) = mpsc::channel::<Result<()>>();
         let stop_t = stop.clone();
@@ -57,7 +58,7 @@ impl Recorder {
         let handle = std::thread::Builder::new()
             .name("voxlocal-audio".into())
             .spawn(move || -> Result<AudioBuffer> {
-                let opened = open_default();
+                let opened = open(device.as_deref());
                 let (stream, mut cons, rate) = match opened {
                     Ok(v) => {
                         let _ = ready_tx.send(Ok(()));
@@ -107,9 +108,29 @@ impl Recorder {
 
 type Opened = (cpal::Stream, rtrb::Consumer<f32>, u32);
 
-fn open_default() -> Result<Opened> {
-    let device = cpal::default_host()
-        .default_input_device()
+/// Nomi dei microfoni disponibili, nell'ordine del sistema.
+pub fn input_devices() -> Vec<String> {
+    cpal::default_host()
+        .input_devices()
+        .map(|it| {
+            it.filter_map(|d| d.description().ok().map(|x| x.name().to_string()))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn open(name: Option<&str>) -> Result<Opened> {
+    let host = cpal::default_host();
+    let chosen = name.and_then(|n| {
+        host.input_devices()
+            .ok()?
+            .find(|d| d.description().is_ok_and(|x| x.name() == n))
+    });
+    if name.is_some() && chosen.is_none() {
+        log::warn!("microfono {name:?} non trovato, uso quello di default");
+    }
+    let device = chosen
+        .or_else(|| host.default_input_device())
         .context("nessun microfono disponibile")?;
     let config = device.default_input_config()?;
     let rate = config.sample_rate();

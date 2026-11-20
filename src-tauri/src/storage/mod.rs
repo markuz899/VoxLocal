@@ -112,6 +112,48 @@ pub struct Dictation {
     pub total_ms: Option<u64>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+pub struct HistoryItem {
+    pub id: i64,
+    pub created_at: i64,
+    pub mode: Option<String>,
+    pub raw_text: String,
+    pub final_text: String,
+    pub status: String,
+    pub error: Option<String>,
+    pub llm_provider: Option<String>,
+    pub audio_ms: i64,
+    pub total_ms: Option<i64>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize)]
+pub struct ModeUpdate {
+    pub slug: String,
+    pub name: String,
+    pub system_prompt: String,
+    pub user_template: String,
+    pub provider_id: Option<String>,
+    pub model: Option<String>,
+    pub temperature: f64,
+}
+
+fn builtin_system(b: &Builtin) -> String {
+    if b.task.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n\n{RULES}", b.task)
+    }
+}
+
+/// Ogni parola diventa un prefisso tra virgolette: niente sintassi FTS5 dall'utente.
+fn fts_query(query: &str) -> String {
+    query
+        .split_whitespace()
+        .map(|w| format!("\"{}\"*", w.replace('"', "")))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 pub struct Storage {
     conn: Mutex<Connection>,
 }
@@ -144,11 +186,7 @@ impl Storage {
             tx.pragma_update(None, "user_version", i as i64 + 1)?;
         }
         for (i, b) in BUILTINS.iter().enumerate() {
-            let system = if b.task.is_empty() {
-                String::new()
-            } else {
-                format!("{}\n\n{RULES}", b.task)
-            };
+            let system = builtin_system(b);
             tx.execute(
                 "INSERT OR IGNORE INTO modes (slug, name, system_prompt, user_template, provider_id, builtin, sort)
                  VALUES (?1, ?2, ?3, ?4, ?5, 1, ?6)",
@@ -199,6 +237,118 @@ impl Storage {
         Ok(())
     }
 
+    pub fn update_mode(&self, m: &ModeUpdate) -> Result<()> {
+        let n = self.conn.lock().unwrap().execute(
+            "UPDATE modes SET name = ?2, system_prompt = ?3, user_template = ?4, provider_id = ?5,
+             model = ?6, temperature = ?7 WHERE slug = ?1",
+            params![
+                m.slug,
+                m.name.trim(),
+                m.system_prompt,
+                m.user_template,
+                m.provider_id.as_deref().filter(|p| !p.is_empty()),
+                m.model.as_deref().filter(|p| !p.is_empty()),
+                m.temperature.clamp(0.0, 2.0),
+            ],
+        )?;
+        anyhow::ensure!(n == 1, "modalità {} non trovata", m.slug);
+        Ok(())
+    }
+
+    /// Nuova modalità personalizzata, partendo dal prompt di "Pulito". Restituisce lo slug.
+    pub fn create_mode(&self, name: &str) -> Result<String> {
+        let base = self
+            .mode("clean")?
+            .ok_or_else(|| anyhow::anyhow!("modalità clean mancante"))?;
+        let slug = format!("custom_{}", now_ms());
+        self.conn.lock().unwrap().execute(
+            "INSERT INTO modes (slug, name, system_prompt, user_template, builtin, sort)
+             VALUES (?1, ?2, ?3, ?4, 0, 100)",
+            params![slug, name.trim(), base.system_prompt, base.user_template],
+        )?;
+        Ok(slug)
+    }
+
+    /// Cancella una modalità personalizzata; quelle predefinite si possono solo ripristinare.
+    pub fn delete_mode(&self, slug: &str) -> Result<()> {
+        let n = self.conn.lock().unwrap().execute(
+            "DELETE FROM modes WHERE slug = ?1 AND builtin = 0",
+            params![slug],
+        )?;
+        anyhow::ensure!(n == 1, "si possono eliminare solo le modalità create da te");
+        Ok(())
+    }
+
+    /// Riporta una modalità predefinita al testo originale.
+    pub fn reset_mode(&self, slug: &str) -> Result<()> {
+        let b = BUILTINS
+            .iter()
+            .find(|b| b.slug == slug)
+            .ok_or_else(|| anyhow::anyhow!("{slug} non è una modalità predefinita"))?;
+        self.conn.lock().unwrap().execute(
+            "UPDATE modes SET name = ?2, system_prompt = ?3, user_template = ?4, provider_id = ?5,
+             model = NULL, temperature = 0.2 WHERE slug = ?1",
+            params![b.slug, b.name, builtin_system(b), USER_TEMPLATE, b.provider],
+        )?;
+        Ok(())
+    }
+
+    /// Cronologia, più recenti prima. Con `query` usa la ricerca full-text.
+    pub fn history(&self, query: &str, limit: usize, offset: usize) -> Result<Vec<HistoryItem>> {
+        let conn = self.conn.lock().unwrap();
+        let fts = fts_query(query);
+        let filter = if fts.is_empty() {
+            ""
+        } else {
+            "AND d.id IN (SELECT rowid FROM dictations_fts WHERE dictations_fts MATCH ?3)"
+        };
+        let sql = format!(
+            "SELECT d.id, d.created_at, m.name, d.raw_text, d.final_text, d.status, d.error,
+                    d.llm_provider, d.audio_ms, d.total_ms
+             FROM dictations d LEFT JOIN modes m ON m.id = d.mode_id
+             WHERE 1 = 1 {filter} ORDER BY d.created_at DESC, d.id DESC LIMIT ?1 OFFSET ?2"
+        );
+        let mut st = conn.prepare(&sql)?;
+        let map = |r: &rusqlite::Row| {
+            Ok(HistoryItem {
+                id: r.get(0)?,
+                created_at: r.get(1)?,
+                mode: r.get(2)?,
+                raw_text: r.get(3)?,
+                final_text: r.get(4)?,
+                status: r.get(5)?,
+                error: r.get(6)?,
+                llm_provider: r.get(7)?,
+                audio_ms: r.get(8)?,
+                total_ms: r.get(9)?,
+            })
+        };
+        let rows = if fts.is_empty() {
+            st.query_map(params![limit as i64, offset as i64], map)?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        } else {
+            st.query_map(params![limit as i64, offset as i64, fts], map)?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        Ok(rows)
+    }
+
+    pub fn delete_dictation(&self, id: i64) -> Result<()> {
+        self.conn
+            .lock()
+            .unwrap()
+            .execute("DELETE FROM dictations WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn clear_history(&self) -> Result<usize> {
+        Ok(self
+            .conn
+            .lock()
+            .unwrap()
+            .execute("DELETE FROM dictations", [])?)
+    }
+
     pub fn vocabulary(&self) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
         let mut st = conn.prepare("SELECT term FROM vocabulary ORDER BY term")?;
@@ -236,22 +386,6 @@ impl Storage {
             ],
         )?;
         Ok(conn.last_insert_rowid())
-    }
-
-    /// Ricerca full-text (con prefisso) su testo grezzo e finale; più recenti prima.
-    pub fn search(&self, query: &str, limit: usize) -> Result<Vec<(i64, String)>> {
-        let conn = self.conn.lock().unwrap();
-        let fts: String = query
-            .split_whitespace()
-            .map(|w| format!("\"{}\"*", w.replace('"', "")))
-            .collect::<Vec<_>>()
-            .join(" ");
-        let mut st = conn.prepare(
-            "SELECT d.id, d.final_text FROM dictations_fts f JOIN dictations d ON d.id = f.rowid
-             WHERE dictations_fts MATCH ?1 ORDER BY d.created_at DESC LIMIT ?2",
-        )?;
-        let rows = st.query_map(params![fts, limit as i64], |r| Ok((r.get(0)?, r.get(1)?)))?;
-        Ok(rows.collect::<rusqlite::Result<_>>()?)
     }
 
     pub fn last_dictation(&self) -> Result<Option<String>> {
@@ -310,12 +444,71 @@ mod tests {
             })
             .unwrap();
         // remove_diacritics: "perche" trova "perché"; prefisso: "cia" trova "Ciao".
-        assert_eq!(s.search("cia perche", 10).unwrap()[0].0, id);
+        assert_eq!(s.history("cia perche", 10, 0).unwrap()[0].id, id);
         assert_eq!(
             s.last_dictation().unwrap().as_deref(),
             Some("Ciao, perché?")
         );
         assert_eq!(s.purge(30).unwrap(), 0);
+    }
+
+    #[test]
+    fn edits_modes_and_pages_history() {
+        let s = Storage::in_memory().unwrap();
+        let slug = s.create_mode("Verbale").unwrap();
+        s.update_mode(&ModeUpdate {
+            slug: slug.clone(),
+            name: "Verbale riunione".into(),
+            system_prompt: "x".into(),
+            user_template: USER_TEMPLATE.into(),
+            provider_id: Some("".into()),
+            model: None,
+            temperature: 5.0,
+        })
+        .unwrap();
+        let m = s.mode(&slug).unwrap().unwrap();
+        assert_eq!(
+            (m.name.as_str(), m.provider_id, m.temperature),
+            ("Verbale riunione", None, 2.0)
+        );
+        assert!(s.delete_mode("clean").is_err());
+        s.delete_mode(&slug).unwrap();
+
+        s.update_mode(&ModeUpdate {
+            slug: "email".into(),
+            name: "Mail".into(),
+            system_prompt: "rotto".into(),
+            user_template: "{{text}}".into(),
+            provider_id: None,
+            model: None,
+            temperature: 0.5,
+        })
+        .unwrap();
+        s.reset_mode("email").unwrap();
+        let e = s.mode("email").unwrap().unwrap();
+        assert_eq!(e.name, "Email");
+        assert!(e.system_prompt.contains("<dettato>"));
+
+        for t in ["uno", "due", "tre"] {
+            s.insert_dictation(&Dictation {
+                raw_text: t.into(),
+                final_text: t.into(),
+                stt_provider: "local".into(),
+                status: "ok",
+                mode_id: Some(e.id),
+                ..Default::default()
+            })
+            .unwrap();
+        }
+        let page = s.history("", 2, 0).unwrap();
+        assert_eq!(page.len(), 2);
+        assert_eq!(page[0].final_text, "tre");
+        assert_eq!(page[0].mode.as_deref(), Some("Email"));
+        assert_eq!(s.history("", 2, 2).unwrap()[0].final_text, "uno");
+        let found = s.history("du", 10, 0).unwrap();
+        assert_eq!(found.len(), 1);
+        s.delete_dictation(found[0].id).unwrap();
+        assert_eq!(s.clear_history().unwrap(), 2);
     }
 
     #[test]

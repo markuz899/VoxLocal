@@ -44,6 +44,10 @@ pub struct Settings {
     /// I CLI in abbonamento partono a freddo a ogni dettato: serve più margine.
     pub cli_timeout_s: u64,
     pub retention_days: u32,
+    /// Nome del microfono; `None` = quello di default del sistema.
+    pub audio_device: Option<String>,
+    /// false finché l'onboarding non è completato.
+    pub onboarded: bool,
 }
 
 impl Default for Settings {
@@ -65,6 +69,8 @@ impl Default for Settings {
             llm_timeout_s: 15,
             cli_timeout_s: 20,
             retention_days: 90,
+            audio_device: None,
+            onboarded: false,
         }
     }
 }

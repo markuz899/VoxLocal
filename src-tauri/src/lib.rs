@@ -2,6 +2,7 @@ pub mod audio;
 pub mod cli;
 mod commands;
 mod context;
+mod i18n;
 pub mod llm;
 pub mod models;
 mod overlay;
@@ -70,9 +71,19 @@ pub fn run() {
                 if pressed {
                     p.cancel();
                 }
-            } else {
-                p.on_hotkey(pressed);
+                return;
             }
+            // La scorciatoia del comando sulla selezione, altrimenti quella del dettato.
+            let command = p.settings().command_hotkey;
+            let is_command = command
+                .parse::<tauri_plugin_global_shortcut::Shortcut>()
+                .is_ok_and(|c| c.id() == shortcut.id());
+            let trigger = if is_command {
+                pipeline::Trigger::Command
+            } else {
+                pipeline::Trigger::Dictation
+            };
+            p.on_hotkey(pressed, trigger);
         })
         .build();
 
@@ -115,6 +126,7 @@ pub fn run() {
             commands::list_modes,
             commands::update_mode,
             commands::create_mode,
+            commands::create_mode_with_task,
             commands::delete_mode,
             commands::reset_mode,
             commands::get_vocabulary,
@@ -153,11 +165,20 @@ pub fn run() {
             app.manage(pipeline.clone());
             tray::build(&handle, &pipeline)?;
 
-            if let Err(e) = handle.global_shortcut().register(settings.hotkey.as_str()) {
-                pipeline.notify(&format!(
-                    "Scorciatoia {} non disponibile: {e}",
-                    settings.hotkey
-                ));
+            for hk in [&settings.hotkey, &settings.command_hotkey] {
+                if hk.is_empty() {
+                    continue;
+                }
+                if let Err(e) = handle.global_shortcut().register(hk.as_str()) {
+                    pipeline.notify(&format!(
+                        "{} {hk}: {e}",
+                        i18n::tr(
+                            &settings.ui_language,
+                            "Shortcut not available",
+                            "Scorciatoia non disponibile"
+                        )
+                    ));
+                }
             }
             // Primo avvio: l'onboarding guida permessi e download del modello (centinaia di MB,
             // mai scaricati senza che l'utente lo sappia). Dopo, il modello mancante si riscarica.

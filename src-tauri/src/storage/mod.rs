@@ -58,6 +58,13 @@ END;
 ALTER TABLE dictations ADD COLUMN audio_device TEXT;
 CREATE INDEX dictations_app ON dictations(target_app);
 "#,
+    r#"
+ALTER TABLE dictations ADD COLUMN command TEXT;
+UPDATE modes SET system_prompt = replace(system_prompt,
+  'Traduci il dettato in inglese naturale e corretto.',
+  'Traduci il dettato in {{target_language}} naturale e corretto.') WHERE slug = 'translate_en';
+UPDATE modes SET name = 'Traduci' WHERE slug = 'translate_en' AND name = 'Traduci in EN';
+"#,
 ];
 
 /// Regole comuni a tutte le modalità: il dettato è dato, non istruzioni (prompt injection).
@@ -81,8 +88,28 @@ const BUILTINS: &[Builtin] = &[
     Builtin { slug: "email", name: "Email", task: "Trasforma il dettato in un'email chiara e cortese, con saluto e chiusura adatti. Mantieni la lingua originale. Non inventare fatti, nomi o date.", provider: None },
     Builtin { slug: "message", name: "Messaggio", task: "Trasforma il dettato in un messaggio breve e naturale per chat (Slack, WhatsApp). Mantieni la lingua originale e il tono.", provider: None },
     Builtin { slug: "bullets", name: "Elenco puntato", task: "Trasforma il dettato in un elenco puntato conciso, una voce per riga che inizia con \"- \". Mantieni la lingua originale.", provider: None },
-    Builtin { slug: "translate_en", name: "Traduci in EN", task: "Traduci il dettato in inglese naturale e corretto.", provider: None },
+    Builtin { slug: "translate_en", name: "Traduci", task: "Traduci il dettato in {{target_language}} naturale e corretto.", provider: None },
 ];
+
+/// Il nome da mostrare: una modalità predefinita col nome di fabbrica si mostra nella lingua
+/// dell'interfaccia; un nome cambiato dall'utente resta il suo.
+pub fn display_name(slug: &str, name: &str, lang: &str) -> String {
+    let english = match slug {
+        RAW_SLUG => "Raw",
+        "clean" => "Clean",
+        "email" => "Email",
+        "message" => "Message",
+        "bullets" => "Bullet list",
+        "translate_en" => "Translate",
+        _ => return name.to_string(),
+    };
+    let factory = BUILTINS.iter().any(|b| b.slug == slug && b.name == name);
+    if lang == "it" || !factory {
+        name.to_string()
+    } else {
+        english.to_string()
+    }
+}
 
 pub const USER_TEMPLATE: &str = "<dettato>\n{{text}}\n</dettato>";
 
@@ -118,6 +145,8 @@ pub struct Dictation {
     pub total_ms: Option<u64>,
     pub target_app: Option<String>,
     pub audio_device: Option<String>,
+    /// Il comando vocale, per i comandi sulla selezione (raw_text è allora il testo selezionato).
+    pub command: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -142,6 +171,7 @@ pub struct HistoryItem {
     pub total_ms: Option<i64>,
     pub target_app: Option<String>,
     pub audio_device: Option<String>,
+    pub command: Option<String>,
 }
 
 /// Filtri della cronologia; ogni campo vuoto non filtra.
@@ -310,6 +340,22 @@ impl Storage {
         Ok(slug)
     }
 
+    /// Nuova modalità da un compito (la libreria di modalità pronte): le regole comuni vanno in coda.
+    pub fn create_mode_with_task(&self, name: &str, task: &str) -> Result<String> {
+        let slug = format!("custom_{}", now_ms());
+        self.conn.lock().unwrap().execute(
+            "INSERT INTO modes (slug, name, system_prompt, user_template, builtin, sort)
+             VALUES (?1, ?2, ?3, ?4, 0, 100)",
+            params![
+                slug,
+                name.trim(),
+                format!("{}\n\n{RULES}", task.trim()),
+                USER_TEMPLATE
+            ],
+        )?;
+        Ok(slug)
+    }
+
     /// Cancella una modalità personalizzata; quelle predefinite si possono solo ripristinare.
     pub fn delete_mode(&self, slug: &str) -> Result<()> {
         let n = self.conn.lock().unwrap().execute(
@@ -369,7 +415,7 @@ impl Storage {
         let sql = format!(
             "SELECT d.id, d.created_at, m.name, m.slug, d.language, d.raw_text, d.final_text, d.status,
                     d.error, d.stt_provider, d.stt_model, d.llm_provider, d.llm_model, d.audio_ms,
-                    d.stt_ms, d.llm_ms, d.paste_ms, d.total_ms, d.target_app, d.audio_device
+                    d.stt_ms, d.llm_ms, d.paste_ms, d.total_ms, d.target_app, d.audio_device, d.command
              FROM dictations d LEFT JOIN modes m ON m.id = d.mode_id
              WHERE {} ORDER BY d.created_at DESC, d.id DESC LIMIT ?{} OFFSET ?{}",
             cond.join(" AND "),
@@ -400,6 +446,7 @@ impl Storage {
                 total_ms: r.get(17)?,
                 target_app: r.get(18)?,
                 audio_device: r.get(19)?,
+                command: r.get(20)?,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -484,14 +531,14 @@ impl Storage {
         conn.execute(
             "INSERT INTO dictations (created_at, mode_id, language, raw_text, final_text, stt_provider,
                stt_model, llm_provider, llm_model, status, error, audio_ms, stt_ms, llm_ms, paste_ms, total_ms,
-               target_app, audio_device)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+               target_app, audio_device, command)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
             params![
                 now_ms(), d.mode_id, d.language, d.raw_text, d.final_text, d.stt_provider,
                 d.stt_model, d.llm_provider, d.llm_model, d.status, d.error, d.audio_ms as i64,
                 d.stt_ms.map(|v| v as i64), d.llm_ms.map(|v| v as i64),
                 d.paste_ms.map(|v| v as i64), d.total_ms.map(|v| v as i64),
-                d.target_app, d.audio_device,
+                d.target_app, d.audio_device, d.command,
             ],
         )?;
         Ok(conn.last_insert_rowid())
@@ -661,6 +708,14 @@ mod tests {
         assert_eq!(found.len(), 1);
         s.delete_dictation(found[0].id).unwrap();
         assert_eq!(s.clear_history().unwrap(), 2);
+    }
+
+    #[test]
+    fn builtin_names_follow_the_ui_language_until_renamed() {
+        assert_eq!(display_name("clean", "Pulito", "en"), "Clean");
+        assert_eq!(display_name("clean", "Pulito", "it"), "Pulito");
+        assert_eq!(display_name("clean", "Pulizia mia", "en"), "Pulizia mia");
+        assert_eq!(display_name("custom_1", "LinkedIn", "en"), "LinkedIn");
     }
 
     #[test]

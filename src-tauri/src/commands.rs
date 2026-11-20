@@ -176,6 +176,14 @@ pub fn create_mode(app: AppHandle, p: P, name: String) -> R<String> {
     Ok(slug)
 }
 
+/// Aggiunge una modalità dalla libreria di modalità pronte.
+#[tauri::command]
+pub fn create_mode_with_task(app: AppHandle, p: P, name: String, task: String) -> R<String> {
+    let slug = p.storage.create_mode_with_task(&name, &task).map_err(err)?;
+    crate::tray::refresh(&app);
+    Ok(slug)
+}
+
 #[tauri::command]
 pub fn delete_mode(p: P, slug: String) -> R<()> {
     p.storage.delete_mode(&slug).map_err(err)?;

@@ -52,6 +52,12 @@ pub struct Settings {
     pub check_updates: bool,
     /// Regole "app → modalità": vincono sulla modalità attiva quando il dettato parte in quell'app.
     pub app_modes: Vec<AppMode>,
+    /// Lingua dell'interfaccia: "en" (default) o "it".
+    pub ui_language: String,
+    /// Seconda scorciatoia: comando vocale sul testo selezionato.
+    pub command_hotkey: String,
+    /// Lingua d'arrivo della modalità di traduzione ({{target_language}} nei template).
+    pub translate_to: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -85,6 +91,9 @@ impl Default for Settings {
             onboarded: false,
             check_updates: true,
             app_modes: vec![],
+            ui_language: "en".into(),
+            command_hotkey: "Alt+Shift+Space".into(),
+            translate_to: "en".into(),
         }
     }
 }

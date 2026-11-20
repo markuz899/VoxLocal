@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="it" data-type="software" data-radius="soft" data-buttons="solid">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VoxLocal: informativa sulla privacy</title>
+<meta name="description" content="Quali dati usa VoxLocal, dove restano e quando lasciano il computer.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#ffffff">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400..700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/system.css">
+<style>
+:root { --p-bg: #ffffff; --p-surface: #f4f4f4; --p-ink: #111111; --p-muted: #6b6b6b; --p-accent: #1a4be0; --p-accent-ink: #ffffff; --p-action: #1a4be0; --p-action-ink: #ffffff; --font-display: "Outfit", system-ui, sans-serif; --font-text: "Outfit", system-ui, sans-serif; --display-weight: 400; --display-tracking: -0.03em; }
+.doc { max-width: 62ch; padding: var(--s-9) 0; }
+.doc h2 { font-size: var(--t-h3); margin-top: var(--s-8); }
+.doc p, .doc li { font-size: 18px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<main id="top" class="wrap doc">
+  <p><a class="link" href="index.html">VoxLocal</a></p>
+  <h1>Informativa sulla privacy</h1>
+  <p>VoxLocal è un'app di dettatura che lavora sul tuo computer. Questa pagina dice quali dati usa e quando escono dal dispositivo.</p>
+  <h2>Audio</h2>
+  <p>L'audio del microfono resta in memoria il tempo di trascriverlo e poi viene scartato. Non viene mai salvato su disco.</p>
+  <h2>Testi e cronologia</h2>
+  <p>Il testo trascritto e quello riscritto restano in un database sul tuo computer, per il tempo che scegli nelle impostazioni (90 giorni di partenza). Puoi cancellare un dettato o tutta la cronologia dall'app.</p>
+  <h2>Quando i dati lasciano il computer</h2>
+  <ul>
+    <li>Se scegli una trascrizione in cloud (Groq, OpenAI), l'audio del dettato viene inviato a quel servizio.</li>
+    <li>Se scegli una modalità con un provider AI in cloud, il testo trascritto viene inviato a quel provider per essere riscritto.</li>
+    <li>Al primo avvio l'app scarica il modello di trascrizione e, periodicamente, controlla se c'è un aggiornamento.</li>
+  </ul>
+  <p>In tutti questi casi valgono anche le condizioni del servizio che hai scelto.</p>
+  <h2>Chiavi API</h2>
+  <p>Le chiavi dei provider stanno nel portachiavi del sistema operativo (Portachiavi su macOS, Gestione credenziali su Windows), mai in un file in chiaro.</p>
+  <h2>Statistiche</h2>
+  <p>VoxLocal non invia statistiche d'uso, rapporti di crash o dati di telemetria.</p>
+</main>
+</body>
+</html>

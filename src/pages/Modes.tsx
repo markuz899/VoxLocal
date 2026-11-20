@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { api, errorText, type Mode, type ProviderView } from "../api";
+import {
+  api,
+  errorText,
+  type AppMode,
+  type Mode,
+  type ProviderView,
+} from "../api";
 import { useSettings } from "../App";
 import { Button, Notice, PageTitle, Select, TextInput } from "../ui";
 
@@ -247,6 +253,100 @@ export default function Modes() {
           {notice && <Notice tone={notice.tone} text={notice.text} />}
         </div>
       </div>
+      <AppRules modes={modes} />
     </>
+  );
+}
+
+/** Regole "app → modalità": vincono sulla modalità attiva quando il dettato parte in quell'app. */
+function AppRules({ modes }: { modes: Mode[] }) {
+  const { settings, update } = useSettings();
+  const [recent, setRecent] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const rules = settings.app_modes;
+
+  useEffect(() => {
+    api.historyFacets(0, 0).then(
+      (f) => setRecent(f.apps.map(([a]) => a)),
+      () => setRecent([]),
+    );
+  }, []);
+
+  const save = async (next: AppMode[]) =>
+    setError(await update({ app_modes: next }));
+  const modeOptions = modes.map((m): [string, string] => [m.slug, m.name]);
+
+  return (
+    <section className="mt-10" aria-labelledby="rules-h">
+      <h2 id="rules-h" className="mb-1 text-[17px] font-semibold">
+        Modalità per app
+      </h2>
+      <p className="mb-4 max-w-[60ch] text-muted">
+        Quando detti in un'app di questo elenco, VoxLocal usa la sua modalità al
+        posto di quella attiva. Basta una parte del nome: "Mail" vale anche per
+        "Microsoft Outlook Mail".
+      </p>
+      <div className="divide-y divide-line rounded-[10px] border border-line bg-surface">
+        {rules.length === 0 && (
+          <p className="px-4 py-3 text-muted">
+            Nessuna regola: ogni dettato usa la modalità attiva.
+          </p>
+        )}
+        {rules.map((r, i) => (
+          <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+            <TextInput
+              aria-label="App"
+              list="recent-apps"
+              className="w-56"
+              value={r.app}
+              placeholder="Nome dell'app"
+              onChange={(e) =>
+                save(
+                  rules.map((x, k) =>
+                    k === i ? { ...x, app: e.target.value } : x,
+                  ),
+                )
+              }
+            />
+            <span className="text-muted">usa</span>
+            <Select
+              label="Modalità"
+              value={r.mode}
+              onChange={(mode) =>
+                save(rules.map((x, k) => (k === i ? { ...x, mode } : x)))
+              }
+              options={modeOptions}
+            />
+            <span className="flex-1" />
+            <Button
+              variant="ghost"
+              onClick={() => save(rules.filter((_, k) => k !== i))}
+            >
+              Rimuovi
+            </Button>
+          </div>
+        ))}
+      </div>
+      <datalist id="recent-apps">
+        {recent.map((a) => (
+          <option key={a} value={a} />
+        ))}
+      </datalist>
+      <Button
+        className="mt-3"
+        onClick={() =>
+          save([
+            ...rules,
+            {
+              app: recent.find((a) => !rules.some((r) => r.app === a)) ?? "",
+              mode: modes[1]?.slug ?? "raw",
+            },
+          ])
+        }
+      >
+        Aggiungi una regola
+      </Button>
+      <Notice tone="error" text={error} />
+    </section>
   );
 }

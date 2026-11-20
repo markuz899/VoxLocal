@@ -127,7 +127,7 @@ function Shell({ section }: { section: string }) {
         ))}
       </nav>
       <main className="min-w-0 flex-1 overflow-y-auto px-10 pt-8 pb-12">
-        <div className="max-w-[640px]">
+        <div className={active.id === "history" ? "" : "max-w-[640px]"}>
           <Page />
         </div>
       </main>

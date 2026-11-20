@@ -10,7 +10,8 @@
     "format": "prettier --write src",
     "format:check": "prettier --check src",
     "dev:personal": "tauri dev --features subscription-cli",
-    "build:personal": "tauri build --features subscription-cli"
+    "build:personal": "tauri build --features subscription-cli",
+    "test": "node --experimental-strip-types --no-warnings src/diff.test.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.5",

@@ -25,6 +25,12 @@ export interface Settings {
   audio_device: string | null;
   onboarded: boolean;
   check_updates: boolean;
+  app_modes: AppMode[];
+}
+
+export interface AppMode {
+  app: string;
+  mode: string;
 }
 
 export type ProviderKind =
@@ -72,13 +78,40 @@ export interface HistoryItem {
   id: number;
   created_at: number;
   mode: string | null;
+  mode_slug: string | null;
+  language: string | null;
   raw_text: string;
   final_text: string;
   status: "ok" | "llm_fallback" | "cancelled" | "paste_failed" | "error";
   error: string | null;
+  stt_provider: string;
+  stt_model: string | null;
   llm_provider: string | null;
+  llm_model: string | null;
   audio_ms: number;
+  stt_ms: number | null;
+  llm_ms: number | null;
+  paste_ms: number | null;
   total_ms: number | null;
+  target_app: string | null;
+  audio_device: string | null;
+}
+
+export interface HistoryFilter {
+  query: string;
+  since: number | null;
+  mode: string | null;
+  app: string | null;
+}
+
+export interface HistoryFacets {
+  total: number;
+  today: number;
+  week: number;
+  /** [slug, nome, quanti] */
+  modes: [string, string, number][];
+  /** [app, quanti] */
+  apps: [string, number][];
 }
 
 export type Access = "granted" | "denied" | "undetermined" | "unknown";
@@ -127,8 +160,10 @@ export const api = {
   getVocabulary: () => invoke<string[]>("get_vocabulary"),
   addTerm: (term: string) => invoke<void>("add_term", { term }),
   removeTerm: (term: string) => invoke<void>("remove_term", { term }),
-  getHistory: (query: string, limit: number, offset: number) =>
-    invoke<HistoryItem[]>("get_history", { query, limit, offset }),
+  getHistory: (filter: HistoryFilter, limit: number, offset: number) =>
+    invoke<HistoryItem[]>("get_history", { filter, limit, offset }),
+  historyFacets: (today: number, week: number) =>
+    invoke<HistoryFacets>("history_facets", { today, week }),
   deleteDictation: (id: number) => invoke<void>("delete_dictation", { id }),
   clearHistory: () => invoke<number>("clear_history"),
   copyText: (text: string) => invoke<void>("copy_text", { text }),
@@ -149,10 +184,15 @@ export const api = {
 export const events = {
   level: (cb: (rms: number) => void): Promise<UnlistenFn> =>
     listen<number>("audio://level", (e) => cb(e.payload)),
-  state: (cb: (s: PipelineState) => void): Promise<UnlistenFn> =>
-    listen<{ state: PipelineState }>("pipeline://state", (e) =>
-      cb(e.payload.state),
+  state: (
+    cb: (s: PipelineState, app: string | null) => void,
+  ): Promise<UnlistenFn> =>
+    listen<{ state: PipelineState; app: string | null }>(
+      "pipeline://state",
+      (e) => cb(e.payload.state, e.payload.app),
     ),
+  historyChanged: (cb: () => void): Promise<UnlistenFn> =>
+    listen<number>("history://changed", () => cb()),
   modelProgress: (
     cb: (p: { id: string; done: number; total: number }) => void,
   ) =>

@@ -119,6 +119,10 @@ export function Toggle({
   );
 }
 
+/** Campo di testo e select condividono lo stesso aspetto. */
+const FIELD =
+  "h-7 rounded-md border border-line bg-surface px-2 text-[13px] text-ink hover:border-muted/60 focus:border-cobalt focus:outline-none";
+
 export function Select({
   value,
   onChange,
@@ -132,19 +136,36 @@ export function Select({
   label: string;
   className?: string;
 }) {
+  // Stesso aspetto dei campi di testo: niente stile nativo, freccia disegnata a parte.
   return (
-    <select
-      aria-label={label}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`h-7 max-w-64 rounded-md border border-line bg-surface px-2 text-[13px] ${className}`}
-    >
-      {options.map(([v, l]) => (
-        <option key={v} value={v}>
-          {l}
-        </option>
-      ))}
-    </select>
+    <span className={`relative inline-flex max-w-64 ${className}`}>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${FIELD} w-full appearance-none truncate pr-7`}
+      >
+        {options.map(([v, l]) => (
+          <option key={v} value={v}>
+            {l}
+          </option>
+        ))}
+      </select>
+      <svg
+        aria-hidden
+        viewBox="0 0 10 6"
+        className="pointer-events-none absolute top-1/2 right-2.5 h-[6px] w-[10px] -translate-y-1/2 text-muted"
+      >
+        <path
+          d="M1 1l4 4 4-4"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </span>
   );
 }
 
@@ -153,7 +174,7 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       spellCheck={false}
-      className={`h-7 rounded-md border border-line bg-surface px-2 text-[13px] placeholder:text-muted ${className}`}
+      className={`${FIELD} placeholder:text-muted ${className}`}
       {...rest}
     />
   );

@@ -222,7 +222,7 @@ export default function History() {
       </header>
       <Notice tone="error" text={error} />
 
-      <div className="grid min-h-0 flex-1 grid-cols-[minmax(260px,5fr)_minmax(0,7fr)] overflow-hidden rounded-[10px] border border-line bg-surface">
+      <div className="grid min-h-0 flex-1 grid-cols-[minmax(300px,5fr)_minmax(0,7fr)] overflow-hidden rounded-[10px] border border-line bg-surface">
         <div className="flex min-h-0 flex-col border-r border-line">
           <div className="border-b border-line p-2">
             <TextInput
@@ -276,26 +276,25 @@ export default function History() {
                   <AppBadge app={item.target_app} />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline gap-2">
-                      <span className="truncate font-medium">
+                      <span className="min-w-0 truncate font-medium">
                         {item.target_app ?? "App sconosciuta"}
                       </span>
                       <span className="ml-auto shrink-0 text-[12px] text-muted">
                         {formatDate(item.created_at)}
                       </span>
                     </div>
-                    <div className="truncate text-[13px] text-muted">
-                      {item.final_text}
+                    <div className="flex items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate text-[13px] text-muted">
+                        {item.final_text}
+                      </span>
+                      {/* Solo gli stati da notare: un dettato incollato è il caso normale. */}
+                      {item.status !== "ok" && (
+                        <span className="shrink-0 rounded-full border border-warn/50 px-1.5 text-[11px] leading-[18px] text-warn">
+                          {STATUS[item.status]}
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <span
-                    className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] ${
-                      item.status === "ok"
-                        ? "border-line text-muted"
-                        : "border-warn/50 text-warn"
-                    }`}
-                  >
-                    {STATUS[item.status]}
-                  </span>
                 </button>
                 <RowDelete onDelete={() => remove(item.id)} />
               </li>
@@ -522,7 +521,7 @@ function Detail({
           </div>
         ))}
       </dl>
-      <dl className="mt-4 grid grid-cols-5 gap-2 border-t border-line pt-4">
+      <dl className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(104px,1fr))] gap-x-4 gap-y-3 border-t border-line pt-4">
         {times.map(([k, v]) => (
           <div key={k}>
             <dt className="text-[12px] text-muted">{k}</dt>

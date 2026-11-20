@@ -16,7 +16,7 @@ use crate::llm::{self, LlmError, LlmRequest};
 use crate::settings::{secrets, HotkeyMode, Settings};
 use crate::storage::{Dictation, Mode, Storage};
 use crate::stt::{LocalWhisper, OpenAiCompatibleStt, SttOptions, SttProvider, Transcript};
-use crate::{models, paste, tray};
+use crate::{models, overlay, paste, settings, tray};
 
 /// Sotto questa durata è un tocco involontario della hotkey.
 const MIN_AUDIO_MS: u64 = 300;
@@ -36,6 +36,19 @@ pub enum State {
 }
 
 #[derive(Clone, Serialize)]
+struct ModelProgress {
+    id: &'static str,
+    done: u64,
+    total: u64,
+}
+
+#[derive(Clone, Serialize)]
+struct ModelDone {
+    id: &'static str,
+    error: Option<String>,
+}
+
+#[derive(Clone, Serialize)]
 struct StateEvent {
     state: State,
 }
@@ -47,6 +60,7 @@ pub struct Pipeline {
     pub storage: Arc<Storage>,
     inner: Mutex<Inner>,
     downloading: AtomicBool,
+    mic_test: Mutex<Option<Recorder>>,
 }
 
 struct Inner {
@@ -71,6 +85,7 @@ impl Pipeline {
                 generation: 0,
             }),
             downloading: AtomicBool::new(false),
+            mic_test: Mutex::new(None),
         })
     }
 
@@ -130,7 +145,8 @@ impl Pipeline {
         }
 
         let app = self.app.clone();
-        let rec = match Recorder::start(move |level| {
+        let device = self.settings.lock().unwrap().audio_device.clone();
+        let rec = match Recorder::start(device, move |level| {
             let _ = app.emit("audio://level", level);
         }) {
             Ok(r) => r,
@@ -419,6 +435,7 @@ impl Pipeline {
         }
         let _ = self.app.emit("pipeline://state", StateEvent { state });
         tray::show_state(&self.app, state);
+        overlay::show_state(&self.app, state);
         // Esc globale solo mentre serve (DECISIONS D7). Fuori dal lock: register tocca il main thread.
         let gs = self.app.global_shortcut();
         let res = match (prev, state) {
@@ -432,9 +449,15 @@ impl Pipeline {
     }
 
     /// Scarica il modello configurato se manca (una sola volta per volta).
+    /// Scarica il modello configurato se manca.
     pub fn ensure_model(self: &Arc<Self>) {
         let id = self.settings.lock().unwrap().local_model.clone();
-        let Some(info) = models::find(&id) else {
+        self.download_model(&id);
+    }
+
+    /// Scarica un modello (uno alla volta). Eventi: `models://progress` e `models://done`.
+    pub fn download_model(self: &Arc<Self>, id: &str) {
+        let Some(info) = models::find(id) else {
             return;
         };
         if models::is_installed(info) || self.downloading.swap(true, Ordering::SeqCst) {
@@ -443,29 +466,89 @@ impl Pipeline {
         let me = self.clone();
         tauri::async_runtime::spawn(async move {
             let app = me.app.clone();
-            let mut last = 0;
+            let mut last = u64::MAX;
             let res = models::download(info, |done, total| {
                 let pct = done * 100 / total.max(1);
                 if pct != last {
                     last = pct;
-                    let _ = app.emit("models://progress", (info.id, done, total));
+                    let _ = app.emit(
+                        "models://progress",
+                        ModelProgress {
+                            id: info.id,
+                            done,
+                            total,
+                        },
+                    );
                     tray::set_status(&app, &format!("Scarico {}… {pct}%", info.id));
                 }
             })
             .await;
             me.downloading.store(false, Ordering::SeqCst);
-            match res {
-                Ok(_) => {
+            let error = res.as_ref().err().map(|e| format!("{e:#}"));
+            let _ = me.app.emit(
+                "models://done",
+                ModelDone {
+                    id: info.id,
+                    error: error.clone(),
+                },
+            );
+            match error {
+                None => {
                     tray::set_status(&me.app, "Pronto");
-                    me.notify(&format!("Modello {} pronto.", info.id));
+                    me.notify(&format!("Modello {} pronto.", info.label));
                 }
-                Err(e) => {
-                    log::error!("download modello: {e:#}");
+                Some(e) => {
+                    log::error!("download modello: {e}");
                     tray::set_status(&me.app, "Download non riuscito");
-                    me.notify(&format!("Download del modello non riuscito: {e:#}"));
+                    me.notify(&format!("Download del modello non riuscito: {e}"));
                 }
             }
         });
+    }
+
+    /// Prova del microfono per le impostazioni: emette `audio://level` finché non viene fermata.
+    pub fn mic_test(&self, on: bool) -> Result<()> {
+        let mut slot = self.mic_test.lock().unwrap();
+        if let Some(rec) = slot.take() {
+            let _ = rec.stop();
+        }
+        if on {
+            let app = self.app.clone();
+            let device = self.settings.lock().unwrap().audio_device.clone();
+            *slot = Some(Recorder::start(device, move |level| {
+                let _ = app.emit("audio://level", level);
+            })?);
+        }
+        Ok(())
+    }
+
+    pub fn is_downloading(&self) -> bool {
+        self.downloading.load(Ordering::SeqCst)
+    }
+
+    /// Unico punto in cui cambiano le impostazioni (tray e finestra): applica gli effetti
+    /// collaterali, salva, aggiorna il tray e avvisa le finestre aperte.
+    pub fn apply_settings(self: &Arc<Self>, new: Settings) -> Result<()> {
+        let old = self.settings();
+        if new.hotkey != old.hotkey {
+            let gs = self.app.global_shortcut();
+            gs.register(new.hotkey.as_str())
+                .map_err(|e| anyhow!("la scorciatoia {} non è disponibile: {e}", new.hotkey))?;
+            let _ = gs.unregister(old.hotkey.as_str());
+        }
+        if new.local_model != old.local_model {
+            let info = models::find(&new.local_model)
+                .ok_or_else(|| anyhow!("modello sconosciuto: {}", new.local_model))?;
+            self.stt.set_model(models::path(info));
+        }
+        if new.keep_warm_minutes != old.keep_warm_minutes {
+            self.stt.set_keep_warm(new.keep_warm());
+        }
+        *self.settings.lock().unwrap() = new.clone();
+        settings::save(&self.app, &new);
+        tray::refresh(&self.app);
+        let _ = self.app.emit("settings://changed", &new);
+        Ok(())
     }
 
     pub fn notify(&self, body: &str) {

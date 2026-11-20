@@ -1,8 +1,11 @@
 pub mod audio;
 pub mod cli;
+mod commands;
 pub mod llm;
 pub mod models;
+mod overlay;
 pub mod paste;
+mod permissions;
 pub mod pipeline;
 pub mod settings;
 pub mod storage;
@@ -12,7 +15,7 @@ mod tray;
 use std::sync::Arc;
 use std::time::Duration;
 
-use tauri::{Manager, RunEvent};
+use tauri::{AppHandle, Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, ShortcutState};
 
 use pipeline::Pipeline;
@@ -28,6 +31,32 @@ pub fn data_dir() -> std::path::PathBuf {
 
 pub fn db_path() -> std::path::PathBuf {
     data_dir().join("voxlocal.db")
+}
+
+/// Apre (o porta davanti) la finestra principale, opzionalmente su una sezione (`#history`, …).
+/// Creata su richiesta e distrutta alla chiusura: a riposo non occupa RAM (ARCHITECTURE §10).
+pub(crate) fn open_main(app: &AppHandle, section: Option<&str>) {
+    if let Some(w) = app.get_webview_window("main") {
+        if let Some(s) = section {
+            let _ = w.emit("navigate", s);
+        }
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        return;
+    }
+    let url = format!("index.html#{}", section.unwrap_or(""));
+    let res = WebviewWindowBuilder::new(app, "main", WebviewUrl::App(url.into()))
+        .title("VoxLocal")
+        .inner_size(880.0, 620.0)
+        .min_inner_size(720.0, 520.0)
+        .center()
+        .build();
+    match res {
+        Ok(w) => {
+            let _ = w.set_focus();
+        }
+        Err(e) => log::error!("finestra principale: {e}"),
+    }
 }
 
 pub fn run() {
@@ -47,7 +76,10 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         // single-instance deve essere il primo plugin registrato.
-        .plugin(tauri_plugin_single_instance::init(|_, _, _| {}))
+        // Riaprire l'app (doppio clic, Spotlight) porta davanti le impostazioni.
+        .plugin(tauri_plugin_single_instance::init(|app, _, _| {
+            open_main(app, None)
+        }))
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(log::LevelFilter::Info)
@@ -58,6 +90,45 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(shortcuts)
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .invoke_handler(tauri::generate_handler![
+            commands::get_settings,
+            commands::save_settings,
+            commands::list_input_devices,
+            commands::mic_test,
+            commands::list_models,
+            commands::download_model,
+            commands::delete_model,
+            commands::list_providers,
+            commands::save_provider,
+            commands::set_api_key,
+            commands::delete_api_key,
+            commands::check_provider,
+            commands::list_provider_models,
+            commands::list_modes,
+            commands::update_mode,
+            commands::create_mode,
+            commands::delete_mode,
+            commands::reset_mode,
+            commands::get_vocabulary,
+            commands::add_term,
+            commands::remove_term,
+            commands::get_history,
+            commands::delete_dictation,
+            commands::clear_history,
+            commands::copy_text,
+            commands::permissions_status,
+            commands::request_microphone,
+            commands::request_accessibility,
+            commands::open_permission_settings,
+            commands::get_autostart,
+            commands::set_autostart,
+            commands::finish_onboarding,
+            commands::app_info,
+        ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -81,7 +152,13 @@ pub fn run() {
                     settings.hotkey
                 ));
             }
-            pipeline.ensure_model();
+            // Primo avvio: l'onboarding guida permessi e download del modello (centinaia di MB,
+            // mai scaricati senza che l'utente lo sappia). Dopo, il modello mancante si riscarica.
+            if settings.onboarded {
+                pipeline.ensure_model();
+            } else {
+                open_main(&handle, Some("onboarding"));
+            }
 
             // Rilascia il modello whisper dopo `keep_warm_minutes` di inattività.
             let stt = pipeline.stt.clone();

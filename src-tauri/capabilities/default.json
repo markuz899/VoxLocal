@@ -1,7 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Finestra principale: solo eventi e API core, nessun accesso a rete o segreti.",
-  "windows": ["main"],
-  "permissions": ["core:default"]
+  "description": "Finestre dell'app: comandi VoxLocal, eventi e API core. Nessuna rete n\u00e9 segreti nel webview.",
+  "windows": [
+    "main",
+    "overlay"
+  ],
+  "permissions": [
+    "core:default"
+  ]
 }

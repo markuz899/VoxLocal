@@ -1,8 +1,10 @@
 //! Speech-to-text: trait comune e implementazioni.
 
 mod local_whisper;
+mod openai_compat;
 
 pub use local_whisper::LocalWhisper;
+pub use openai_compat::OpenAiCompatibleStt;
 
 use anyhow::Result;
 use async_trait::async_trait;

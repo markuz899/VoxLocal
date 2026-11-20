@@ -158,7 +158,7 @@ CREATE TABLE modes (
 
 ## 6. Impostazioni
 
-Le impostazioni stanno in `tauri-plugin-store` (`settings.json` in `app_config_dir`). È JSON leggibile e versionato con `"version"`. Lato Rust c'è uno struct `Settings` serde con `#[serde(default)]` su tutto: un file vecchio o parziale non rompe l'avvio.
+Formato obiettivo (in Fase 2 lo struct `Settings` è ancora piatto, con solo i campi già usati; diventa annidato in Fase 4). Le impostazioni stanno in `tauri-plugin-store` (`settings.json` in `app_config_dir`). È JSON leggibile e versionato con `"version"`. Lato Rust c'è uno struct `Settings` serde con `#[serde(default)]` su tutto: un file vecchio o parziale non rompe l'avvio.
 
 ```jsonc
 {
@@ -234,11 +234,7 @@ L'onboarding controlla ogni permesso, mostra lo stato e ricontrolla a intervalli
 - Manifest statico nel codice: nome, file, dimensione e SHA-256 per `tiny`, `base`, `small`, `medium`, `large-v3-turbo` e le varianti `-q5_0`/`-q8_0`.
 - Sorgente: `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/<file>`.
 - Download in streaming su `<file>.part` con supporto `Range` per riprendere, SHA-256 calcolato al volo, `rename` atomico solo se l'hash coincide. L'avanzamento arriva al webview con l'evento `models://progress`.
-- **Default per hardware:**
-  - Apple Silicon con ≥ 16 GB → `large-v3-turbo-q5_0`
-  - Apple Silicon con 8 GB → `small-q5_1`
-  - Intel o Windows senza GPU → `base`
-  - Il benchmark della Fase 2 può rivedere queste soglie.
+- **Default:** `base` su tutte le piattaforme (misurato in Fase 2, DECISIONS D19). L'onboarding proporrà `large-v3-turbo-q5_0` sulle macchine con ≥ 16 GB.
 
 ## 12. Hook post-MVP (già previsti, implementazione vuota)
 
@@ -255,4 +251,4 @@ L'onboarding controlla ogni permesso, mostra lo stato e ricontrolla a intervalli
 | Latenza < 1,5 s (base, 10 s, M1) | modello già caldo, resampling in una passata, Metal, greedy, `no_timestamps` |
 | Avvio < 1 s fino al tray | tray creato prima di tutto il resto; DB e store aperti dopo, in un task |
 
-Misure: `cargo run --release --bin bench -- --model base fixtures/*.wav` stampa load_ms, stt_ms e RTF per file. In app, il comando `debug_metrics` restituisce RSS e le ultime N latenze.
+Misure: `cargo run --release --example bench -- --model base` (in `src-tauri`) stampa caricamento, resample, stt mediano/minimo e RTF per ogni WAV in `fixtures/`. In app, il comando `debug_metrics` restituisce RSS e le ultime N latenze.

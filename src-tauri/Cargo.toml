@@ -1,0 +1,51 @@
+[package]
+name = "voxlocal"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "voxlocal_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.6", features = [] }
+
+[dependencies]
+anyhow = "1.0.104"
+arboard = "3.7.0"
+async-trait = "0.1.92"
+cpal = "0.18.2"
+dirs = "7.0.0"
+enigo = "0.6.1"
+futures-util = "0.3.34"
+hex = "0.4.3"
+hound = "3.5.1"
+log = "0.4.35"
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "stream", "json"] }
+rtrb = "0.4.1"
+rubato = "5.1.0"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha2 = "0.11.1"
+tauri = { version = "2.12.7", features = ["tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2.4.1"
+tauri-plugin-log = "2.10.2"
+tauri-plugin-notification = "2.8.1"
+tauri-plugin-opener = "2.7.3"
+tauri-plugin-single-instance = "2.5.5"
+tauri-plugin-store = "2.5.1"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "time", "sync", "fs", "io-util"] }
+tokio-util = "0.7.20"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[target.'cfg(not(all(target_os = "macos", target_arch = "aarch64")))'.dependencies]
+whisper-rs = { version = "=0.16.0", features = ["log_backend"] }
+
+[target.'cfg(all(target_os = "macos", target_arch = "aarch64"))'.dependencies]
+whisper-rs = { version = "=0.16.0", features = ["metal", "log_backend"] }

@@ -66,6 +66,20 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 ## D16 — pnpm con Node 22 (`.nvmrc`)
 - **Perché:** il pnpm installato richiede Node ≥ 22.13. La Tauri CLI sta tra le devDependency (`@tauri-apps/cli`), non è installata a livello globale.
 
+## D17 — Abort di whisper con callback `unsafe` scritta a mano (Fase 2)
+- **Perché:** `FullParams::set_abort_callback_safe` di whisper-rs 0.16 passa a whisper.cpp un `Box<Box<dyn FnMut>>` ma il trampolino lo rilegge come la closure concreta `F`. Il risultato è una lettura di memoria non valida (panico `failed to lock mutex: Invalid argument` alla prima trascrizione).
+- **Soluzione:** uso `set_abort_callback` + `set_abort_callback_user_data` con un puntatore al `CancellationToken`, che vive nello stack frame di `full()`.
+- **Quando si aggiorna whisper-rs:** riverificare (la versione è fissata a `=0.16.0`).
+
+## D18 — Bench come `example`, non `[[bin]]`
+- **Perché:** Tauri impacchetta nell'app *tutti* i binari del crate, e il bench aggiungeva 4 MB al bundle. Si lancia con `cargo run --release --example bench`.
+
+## D19 — Modello di default `base` ovunque
+- **Misura su M1 8 GB, ~10 s di audio:** `base` impiega circa 0,5 s; `small-q5_1` circa 1,4 s ed è anche peggiore sull'italiano di prova. Proporre modelli più grandi in base alla RAM è rimandato all'onboarding (Fase 4).
+
+## D20 — `anyhow` al posto degli enum `thiserror` per modulo (per ora)
+- **Perché:** in Fase 2 nessun chiamante deve distinguere i tipi di errore, perché l'annullamento si legge dal token. Gli enum tipizzati arrivano con lo strato LLM, dove servono (timeout → fallback, 401 → chiave mancante).
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

@@ -1,6 +1,10 @@
-//! Impostazioni persistite con tauri-plugin-store (`settings.json`).
+//! Impostazioni persistite con tauri-plugin-store (`settings.json`) e chiavi nel keyring.
+
+pub mod secrets;
 
 use serde::{Deserialize, Serialize};
+
+use crate::llm::registry::ProviderConfig;
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_store::StoreExt;
 
@@ -14,7 +18,6 @@ pub enum HotkeyMode {
     Toggle,
 }
 
-// ponytail: solo i campi della Fase 2; provider, modalità e cronologia arrivano nelle fasi 3-4
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -29,6 +32,18 @@ pub struct Settings {
     pub restore_clipboard: bool,
     pub restore_delay_ms: u64,
     pub max_seconds: u64,
+    /// Slug della modalità attiva (tabella `modes`).
+    pub active_mode: String,
+    /// Provider LLM per le modalità che non ne indicano uno.
+    pub default_llm: String,
+    /// Personalizzazioni dei preset o provider aggiuntivi (vedi `llm::registry`).
+    pub providers: Vec<ProviderConfig>,
+    /// "local" oppure l'id di un provider con `stt_model` (es. "groq").
+    pub stt_provider: String,
+    pub llm_timeout_s: u64,
+    /// I CLI in abbonamento partono a freddo a ogni dettato: serve più margine.
+    pub cli_timeout_s: u64,
+    pub retention_days: u32,
 }
 
 impl Default for Settings {
@@ -43,6 +58,13 @@ impl Default for Settings {
             restore_clipboard: true,
             restore_delay_ms: 250,
             max_seconds: 600,
+            active_mode: crate::storage::RAW_SLUG.into(),
+            default_llm: "ollama".into(),
+            providers: vec![],
+            stt_provider: "local".into(),
+            llm_timeout_s: 15,
+            cli_timeout_s: 20,
+            retention_days: 90,
         }
     }
 }
@@ -65,6 +87,15 @@ fn system_language() -> String {
         .and_then(|l| l.split(['-', '_']).next().map(str::to_lowercase))
         .filter(|code| whisper_rs::get_lang_id(code).is_some())
         .unwrap_or_else(|| "auto".into())
+}
+
+/// Lettura diretta del file, per i sottocomandi da terminale (l'app usa `load`).
+pub fn read_file() -> Settings {
+    std::fs::read(crate::data_dir().join(FILE))
+        .ok()
+        .and_then(|b| serde_json::from_slice::<serde_json::Value>(&b).ok())
+        .and_then(|v| serde_json::from_value(v[KEY].clone()).ok())
+        .unwrap_or_default()
 }
 
 pub fn load<R: Runtime>(app: &AppHandle<R>) -> Settings {

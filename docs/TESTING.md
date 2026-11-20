@@ -13,7 +13,7 @@ pnpm install
 
 ```sh
 cd src-tauri
-cargo test --lib                              # unit test (resampling)
+cargo test --lib                              # 16 test: resampling, provider (wiremock), CLI finto, registry, SQLite
 cargo fmt --check && cargo clippy --all-targets
 cd .. && pnpm format:check && pnpm build      # tsc + vite
 ```
@@ -43,6 +43,35 @@ Fixture: `en_jfk.wav` (campione di whisper.cpp, licenza MIT), `it_alice_48k.wav`
 
 Log: `~/Library/Logs/app.voxlocal.desktop/VoxLocal.log`. Ogni dettato scrive una riga del tipo
 `dettato ok: audio=… resample=… stt=… paste=… totale=…`.
+
+## Fase 3 — LLM, modalità, chiavi
+
+Sottocomandi del binario (in dev: `src-tauri/target/debug/voxlocal`):
+
+```sh
+voxlocal providers                       # elenco provider + stato chiavi
+pbpaste | voxlocal set-key groq          # chiave nel portachiavi (mai su disco)
+voxlocal vocab add VoxLocal Tauri        # vocabolario → whisper initial_prompt + LLM
+voxlocal check claude-cli                # prova reale con la modalità Pulito + latenza
+```
+
+Nell'app, dal tray:
+- **Modalità:** Grezzo, Pulito, Email, Messaggio, Elenco puntato, Traduci in EN.
+- **Provider LLM predefinito:** quello usato dalle modalità che non ne fissano uno.
+- **Trascrizione:** whisper locale oppure Groq/OpenAI cloud, con ripiego su whisper locale in caso di errore.
+
+Fallback da verificare:
+- **LLM spento o senza chiave:** scegli Ollama non avviato e detta in "Pulito". Deve incollare il testo grezzo, mandare la notifica "Incollo il testo non elaborato" e salvare in cronologia con `status = llm_fallback`.
+- **Esc durante "Elaboro con l'LLM…"** (✎ nel tray): non incolla nulla e il dettato va in cronologia come `cancelled`.
+
+Cronologia: `sqlite3 ~/Library/Application\ Support/app.voxlocal.desktop/voxlocal.db "select status, raw_text, final_text, llm_provider, llm_ms, total_ms from dictations order by id desc limit 5"`.
+
+Misure del 2026-11-20 (`voxlocal check`, modalità Pulito, frase di 18 parole):
+
+| Provider | Latenza |
+|---|---|
+| claude-cli (Haiku, abbonamento) | 2,2 s |
+| codex-cli (abbonamento) | 4,9 s |
 
 ## Metriche misurate
 

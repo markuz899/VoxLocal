@@ -34,7 +34,7 @@ quello che non è deciso sta in [OPEN_QUESTIONS.md](OPEN_QUESTIONS.md).
 Regole di dipendenza tra moduli:
 
 - `pipeline` conosce i trait, non le implementazioni. Le riceve dal `registry`.
-- `stt`, `llm` e `paste` non sanno nulla di Tauri, quindi si testano con `cargo test` senza app.
+- `stt`, `llm`, `storage` e `paste` non sanno nulla di Tauri, quindi si testano con `cargo test` senza app.
 - Solo `commands.rs` e `pipeline` emettono eventi verso il webview.
 - Il webview non fa rete. La CSP di Tauri blocca `connect-src` verso l'esterno: la difesa è tecnica, non solo una convenzione.
 
@@ -93,7 +93,7 @@ pub struct LlmResponse { pub text: String, pub usage: Option<Usage> }
 #[async_trait] pub trait LlmProvider: Send + Sync { /* come da requisito */ }
 ```
 
-**Registry:** la configurazione di un provider è `ProviderConfig { id, kind, base_url, model, extra }`. Il registry fa un `match kind` e restituisce un `Arc<dyn …Provider>`, tenuto in cache finché la sua configurazione non cambia. Per aggiungere un provider bastano un file (`llm/mistral_native.rs`, per esempio) e un ramo nel `match`.
+**Registry:** la configurazione di un provider è `ProviderConfig { id, label, kind, base_url, model, needs_key, send_sampling, command, system_flag, model_flag, clear_env, stt_model }`. I preset stanno nel codice; `settings.providers` contiene solo personalizzazioni e aggiunte, che vincono sui preset con lo stesso id. Il registry fa un `match kind` e restituisce un `Arc<dyn …Provider>`, tenuto in cache finché la sua configurazione non cambia. Per aggiungere un provider bastano un file (`llm/mistral_native.rs`, per esempio) e un ramo nel `match`.
 
 **Preset OpenAI-compatibili:** sono dati, non codice. Sono una tabella statica `(id, label, base_url, needs_key, default_model)`: OpenAI, Groq, OpenRouter, Together, Mistral, DeepSeek, Ollama `:11434/v1`, LM Studio `:1234/v1` e llama.cpp server `:8080/v1`.
 

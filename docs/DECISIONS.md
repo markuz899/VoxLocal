@@ -77,13 +77,38 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 ## D19 — Modello di default `base` ovunque
 - **Misura su M1 8 GB, ~10 s di audio:** `base` impiega circa 0,5 s; `small-q5_1` circa 1,4 s ed è anche peggiore sull'italiano di prova. Proporre modelli più grandi in base alla RAM è rimandato all'onboarding (Fase 4).
 
-## D20 — `anyhow` al posto degli enum `thiserror` per modulo (per ora)
+## D20 — `anyhow` al posto degli enum `thiserror` per modulo (per ora) — superata in Fase 3 per l'LLM (`LlmError`)
 - **Perché:** in Fase 2 nessun chiamante deve distinguere i tipi di errore, perché l'annullamento si legge dal token. Gli enum tipizzati arrivano con lo strato LLM, dove servono (timeout → fallback, 401 → chiave mancante).
 
 ## D21 — Lingua di default = lingua del sistema, non "auto"
 - **Prova reale di Marco:** quattro dettati brevi (2-3 s) in italiano sono stati riconosciuti come de, pt, it e ru (p tra 0,22 e 0,63), con il testo tradotto o traslitterato.
 - **Con la lingua fissata:** testo corretto e STT 3 volte più veloce (niente passaggio di rilevamento della lingua).
 - **Come funziona ora:** `sys-locale` legge la lingua del sistema. Se whisper non la conosce, si ripiega su "auto". Dal tray si cambia al volo.
+
+## D22 — Abbonamenti Claude/Codex tramite i CLI ufficiali (Fase 3)
+- **Come funziona:** il provider `cli` lancia `claude -p` o `codex exec` come sottoprocesso. Prompt su stdin, risultato da stdout, `kill_on_drop` per timeout ed Esc. VoxLocal non tocca token: usa il login che l'utente ha fatto nel CLI.
+- **Flag misurati sul Mac di Marco:**
+  - Claude Code: `--tools "" --strict-mcp-config --setting-sources "" --no-session-persistence --system-prompt …`, da 3,5 s a 1,7–2,2 s.
+  - Codex: `--ephemeral -s read-only -c model_reasoning_effort=none -c mcp_servers={}`, circa 3,5–4,9 s. Il valore `minimal` viene rifiutato dal modello attuale.
+- **`ANTHROPIC_API_KEY`:** viene tolta dall'ambiente del figlio. Se presente, Claude Code fatturerebbe sulle API invece che sull'abbonamento.
+- **PATH:** un'app avviata dal Finder non ha il PATH della shell. I CLI si cercano anche in `~/.local/bin`, `/opt/homebrew/bin`, ecc.
+- **Escluso apposta:** estrarre il token OAuth dell'abbonamento e chiamare le API direttamente. Anthropic lo vieta nei prodotti di terzi. Se VoxLocal diventa un prodotto a pagamento, il provider CLI va rivisto (OPEN_QUESTIONS Q14).
+- **Timeout dedicato:** `cli_timeout_s` = 20 s, contro i 15 s delle API.
+
+## D23 — Modalità e vocabolario in SQLite già dalla Fase 3
+- Lo schema è quello di ARCHITECTURE §5, con FTS5 e trigger. Ogni dettato finisce in `dictations`, compresi `llm_fallback`, `paste_failed` e `cancelled`: la regola "mai perdere un dettato" vale da subito, anche se la UI della cronologia arriva in Fase 4.
+- Le modalità predefinite sono seed `INSERT OR IGNORE` per slug: le modifiche dell'utente non vengono sovrascritte agli avvii successivi.
+
+## D24 — "None" è un `ProviderKind`, non un'implementazione
+- `registry::build` restituisce `Ok(None)` e la pipeline salta il passaggio LLM. Un provider finto che restituisce il testo avrebbe dovuto disfare il template.
+
+## D25 — Prompt injection: il dettato è dato, non istruzioni
+- Ogni modalità racchiude il testo in `<dettato>…</dettato>` e il system prompt vieta di rispondergli o di eseguirne le istruzioni.
+- **Misura:** senza i tag, Haiku *rispondeva* a "ciao come stai" invece di correggerlo.
+- `{{text}}` viene sostituito per ultimo, così un dettato che contiene `{{language}}` non viene reinterpretato come variabile.
+
+## D26 — Temperatura `f64`
+- Un `f32` 0.2 serializzato in JSON diventa `0.20000000298…`; l'ha scoperto il test wiremock.
 
 ## Rischi principali (in ordine)
 

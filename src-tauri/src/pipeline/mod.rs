@@ -943,6 +943,7 @@ impl Pipeline {
             .into_iter()
             .collect();
         let mut out: [Vec<crate::stt::Segment>; 2] = [vec![], vec![]];
+        let mut audios: [Option<crate::audio::AudioBuffer>; 2] = [None, None];
         for (k, path) in parts.into_iter().enumerate() {
             let Some(path) = path else { continue };
             let audio =
@@ -971,8 +972,18 @@ impl Pipeline {
             })
             .await??;
             out[k] = crate::meeting::keep_spoken(segments, &audio);
+            audios[k] = Some(audio);
         }
-        let [me, others] = out;
+        let [mut me, others] = out;
+        // con le casse il microfono riprende le app: si toglie confrontando il suono delle due tracce
+        if let [Some(mic), Some(apps)] = &audios {
+            let before = me.len();
+            me = crate::meeting::drop_acoustic_echo(me, mic, apps);
+            log::info!(
+                "riunione {id}: {} segmenti del microfono tolti come eco",
+                before - me.len()
+            );
+        }
         Ok(crate::meeting::merge(me, others))
     }
 

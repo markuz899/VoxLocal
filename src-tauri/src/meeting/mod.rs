@@ -276,6 +276,61 @@ fn words(t: &str) -> std::collections::HashSet<String> {
         .collect()
 }
 
+/// Inviluppo di energia a passi di 20 ms (50 al secondo) di un tratto della traccia.
+fn envelope(audio: &AudioBuffer, start_ms: i64, end_ms: i64) -> Vec<f32> {
+    let step = (WHISPER_RATE / 50) as usize;
+    let a = (start_ms.max(0) as usize * WHISPER_RATE as usize / 1000).min(audio.samples.len());
+    let b = (end_ms.max(0) as usize * WHISPER_RATE as usize / 1000).clamp(a, audio.samples.len());
+    audio.samples[a..b]
+        .chunks(step)
+        .map(|c| (c.iter().map(|x| x * x).sum::<f32>() / c.len() as f32).sqrt())
+        .collect()
+}
+
+fn correlation(x: &[f32], y: &[f32]) -> f32 {
+    let n = x.len().min(y.len());
+    if n < 10 {
+        return 0.0;
+    }
+    let (x, y) = (&x[..n], &y[..n]);
+    let mx = x.iter().sum::<f32>() / n as f32;
+    let my = y.iter().sum::<f32>() / n as f32;
+    let (mut sxy, mut sxx, mut syy) = (0.0, 0.0, 0.0);
+    for i in 0..n {
+        let (dx, dy) = (x[i] - mx, y[i] - my);
+        sxy += dx * dy;
+        sxx += dx * dx;
+        syy += dy * dy;
+    }
+    if sxx <= f32::EPSILON || syy <= f32::EPSILON {
+        return 0.0;
+    }
+    sxy / (sxx * syy).sqrt()
+}
+
+/// Toglie dal microfono l'eco delle casse confrontando il suono, non le parole: se nel tratto di un
+/// segmento il volume del microfono segue quello dell'audio delle app (con un ritardo fino a 400 ms),
+/// è la voce delle app ripresa dal microfono, anche quando Whisper l'ha trascritta in modo diverso.
+// ponytail: correlazione degli inviluppi a 20 ms; un vero cancellatore d'eco (AEC) se servisse di più.
+pub fn drop_acoustic_echo(me: Vec<Segment>, mic: &AudioBuffer, apps: &AudioBuffer) -> Vec<Segment> {
+    me.into_iter()
+        .filter(|s| {
+            let (a, b) = (s.start_ms as i64, s.end_ms.max(s.start_ms + 400) as i64);
+            let m = envelope(mic, a, b);
+            if window_rms(apps, s.start_ms, b as u64) < SILENCE_RMS {
+                return true; // le app tacciono: è la tua voce
+            }
+            let best = (0..=20)
+                .map(|lag| correlation(&m, &envelope(apps, a - lag * 20, b - lag * 20)))
+                .fold(f32::MIN, f32::max);
+            best < ECHO_CORRELATION
+        })
+        .collect()
+}
+
+/// Oltre questa correlazione degli inviluppi il tratto del microfono è eco delle app.
+const ECHO_CORRELATION: f32 = 0.6;
+
 /// Unisce le due trascrizioni in ordine di tempo. Con le casse la voce degli altri rientra nel microfono:
 /// un segmento del microfono che si sovrappone nel tempo a uno degli altri e ne ripete le parole è un'eco, e si toglie.
 pub fn merge(me: Vec<Segment>, others: Vec<Segment>) -> Vec<Line> {
@@ -447,6 +502,52 @@ mod tests {
         let _ = std::fs::remove_file(&path);
     }
 
+    /// Una voce finta: rumore modulato da sillabe irregolari.
+    fn speechy(seed: u32, secs: usize, gain: f32) -> Vec<f32> {
+        let mut x = seed;
+        let mut rnd = move || {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            (x as f32 / u32::MAX as f32) * 2.0 - 1.0
+        };
+        let n = secs * 16_000;
+        let mut env = 0.0f32;
+        (0..n)
+            .map(|i| {
+                if i % 2400 == 0 {
+                    env = if rnd() > -0.2 { rnd().abs() } else { 0.0 };
+                }
+                rnd() * env * gain
+            })
+            .collect()
+    }
+
+    #[test]
+    fn acoustic_echo_is_dropped_and_own_voice_kept() {
+        let apps = AudioBuffer {
+            samples: speechy(7, 6, 0.4),
+            sample_rate: WHISPER_RATE,
+        };
+        // l'eco: la voce delle app, 120 ms dopo e più bassa, con il rumore della stanza
+        let mut echo = vec![0f32; 1920];
+        echo.extend(apps.samples.iter().map(|v| v * 0.15));
+        echo.truncate(apps.samples.len());
+        let room = speechy(99, 6, 0.01);
+        let mic_echo = AudioBuffer {
+            samples: echo.iter().zip(&room).map(|(a, b)| a + b).collect(),
+            sample_rate: WHISPER_RATE,
+        };
+        // la tua voce, indipendente dalle app
+        let mic_me = AudioBuffer {
+            samples: speechy(1234, 6, 0.3),
+            sample_rate: WHISPER_RATE,
+        };
+        let segs = || vec![seg(500, 3500, "una frase"), seg(3500, 5800, "un'altra")];
+        assert!(drop_acoustic_echo(segs(), &mic_echo, &apps).is_empty());
+        assert_eq!(drop_acoustic_echo(segs(), &mic_me, &apps).len(), 2);
+    }
+
     #[test]
     fn silence_segments_are_dropped() {
         let mut audio = AudioBuffer {
@@ -524,5 +625,37 @@ mod tests {
         assert!(lines
             .iter()
             .any(|l| l.speaker == Speaker::Others && l.text.to_lowercase().contains("rilascio")));
+    }
+
+    /// Riapplica il filtro anti-eco a una riunione salvata: `VOXLOCAL_MEETING_DIR=… VOXLOCAL_MODEL=… cargo test --release --lib echo_on_saved -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn echo_on_saved_meeting() {
+        let (Ok(dir), Ok(model)) = (
+            std::env::var("VOXLOCAL_MEETING_DIR"),
+            std::env::var("VOXLOCAL_MODEL"),
+        ) else {
+            return;
+        };
+        let dir = std::path::PathBuf::from(dir);
+        let mic = read_track(&dir.join("me.wav")).unwrap();
+        let apps = read_track(&dir.join("others.wav")).unwrap();
+        let stt = crate::stt::LocalWhisper::new(model.into(), None);
+        let opts = crate::stt::SttOptions {
+            language: Some("it".into()),
+            ..Default::default()
+        };
+        let (segs, _) = stt.transcribe_segments(&mic, &opts, |_| {}).unwrap();
+        let segs = keep_spoken(segs, &mic);
+        let kept = drop_acoustic_echo(segs.clone(), &mic, &apps);
+        for s in &segs {
+            let keep = kept.iter().any(|k| k.start_ms == s.start_ms);
+            println!(
+                "{} [{:>6}] {}",
+                if keep { "TIENE" } else { "ECO  " },
+                s.start_ms,
+                s.text
+            );
+        }
     }
 }

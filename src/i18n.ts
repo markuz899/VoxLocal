@@ -362,7 +362,7 @@ const en = {
     "To record the other people too, VoxLocal needs Screen Recording permission (only the audio is used).",
   "meetings.grant": "Grant permission",
   "meetings.micSilent":
-    "Your microphone is sending no sound, so your voice will be missing. Check System Settings → Privacy & Security → Microphone: VoxLocal must be on (turn it off and on again if it already is).",
+    "Your microphone is sending no sound, so your voice will be missing. Stop, pick the microphone you are speaking into next to the Start button, and start again. If it is already the right one, check System Settings → Privacy & Security → Microphone: VoxLocal must be on.",
   "meetings.empty": "No meetings yet.",
   "meetings.transcribing": "Transcribing… {pct}%",
   "meetings.failed": "Transcription failed",
@@ -733,7 +733,7 @@ const it: Record<Key, string> = {
     "Per registrare anche gli altri, VoxLocal ha bisogno del permesso Registrazione schermo (usa solo l'audio).",
   "meetings.grant": "Concedi il permesso",
   "meetings.micSilent":
-    "Il microfono non manda nessun suono, quindi la tua voce mancherà. Controlla Impostazioni di Sistema → Privacy e sicurezza → Microfono: VoxLocal deve essere attivo (se lo è già, spegnilo e riaccendilo).",
+    "Il microfono non manda nessun suono, quindi la tua voce mancherà. Ferma, scegli accanto al pulsante di avvio il microfono in cui stai parlando e riavvia. Se è già quello giusto, controlla Impostazioni di Sistema → Privacy e sicurezza → Microfono: VoxLocal deve essere attivo.",
   "meetings.empty": "Ancora nessuna riunione.",
   "meetings.transcribing": "Trascrivo… {pct}%",
   "meetings.failed": "Trascrizione non riuscita",

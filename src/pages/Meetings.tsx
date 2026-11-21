@@ -8,7 +8,7 @@ import {
 } from "../api";
 import { useSettings } from "../App";
 import { useT } from "../i18n";
-import { Button, Notice, PageTitle, TextInput } from "../ui";
+import { Button, Notice, PageTitle, Select, TextInput } from "../ui";
 import { clock } from "./Files";
 
 export default function Meetings() {
@@ -176,10 +176,11 @@ function Recorder({
           </Button>
         </div>
       ) : (
-        <div className="flex items-center gap-4">
-          <p className="m-0 flex-1 text-[13px] text-muted">
+        <div className="flex flex-wrap items-center gap-4">
+          <p className="m-0 min-w-[200px] flex-1 text-[13px] text-muted">
             {t("meetings.how")}
           </p>
+          <MicPicker />
           <Button variant="primary" onClick={onStart}>
             {t("meetings.start")}
           </Button>
@@ -388,5 +389,26 @@ function Detail({
         </>
       )}
     </section>
+  );
+}
+
+/** Il microfono che registra la tua voce: lo stesso delle impostazioni, scelto qui prima di avviare. */
+function MicPicker() {
+  const t = useT();
+  const { settings, update } = useSettings();
+  const [devices, setDevices] = useState<string[]>([]);
+  useEffect(() => {
+    api.listInputDevices().then(setDevices);
+  }, []);
+  return (
+    <Select
+      label={t("general.microphone")}
+      value={settings.audio_device ?? ""}
+      onChange={(v) => update({ audio_device: v || null })}
+      options={[
+        ["", t("common.systemMic")],
+        ...devices.map((d): [string, string] => [d, d]),
+      ]}
+    />
   );
 }

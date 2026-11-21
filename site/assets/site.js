@@ -1,0 +1,144 @@
+// VoxLocal landing: the page's own motion layer (reveals, hero story, counters, bars, mode typing, card light).
+// Everything rests on its finished state without script and under prefers-reduced-motion.
+
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const root = document.documentElement;
+
+// ---------------------------------------------------------------- reveal on scroll
+function reveals() {
+  // what arrives: each block of a section, cards one after the other (never the hero or the scene)
+  const sel = 'main > section:not(.hero):not(.sc) :is(.section-head, .grid > *, .ui.app, .hx-apps, .faq__item, .vs__row)';
+  document.querySelectorAll(sel).forEach((el) => { if (!el.closest('[data-rv]')) el.setAttribute('data-rv', ''); });
+  document.querySelectorAll('main > section:not(.hero) .grid, main .faq').forEach((g) => g.setAttribute('data-rv-group', ''));
+  const els = [...document.querySelectorAll('[data-rv]')];
+  if (reduced || !('IntersectionObserver' in window)) return;
+  root.classList.add('rv-on');
+  // children of a [data-rv-group] arrive one after the other
+  document.querySelectorAll('[data-rv-group]').forEach((g) => {
+    [...g.querySelectorAll('[data-rv]')].forEach((el, i) => el.style.setProperty('--rv-d', `${i * 90}ms`));
+  });
+  const io = new IntersectionObserver((es) => {
+    for (const e of es) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add('is-in');
+      io.unobserve(e.target);
+    }
+  }, { rootMargin: '0px 0px -12% 0px' });
+  els.forEach((el) => io.observe(el));
+}
+
+// ---------------------------------------------------------------- counters and bars
+function counters() {
+  const els = [...document.querySelectorAll('[data-count]')];
+  const bars = [...document.querySelectorAll('[data-bar]')];
+  const fmt = (v, dec) => v.toLocaleString('it-IT', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  const run = (el) => {
+    const to = parseFloat(el.dataset.count);
+    const dec = (el.dataset.count.split('.')[1] || '').length;
+    if (reduced) { el.textContent = fmt(to, dec); return; }
+    const t0 = performance.now(), dur = 1400;
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = fmt(to * e, dec);
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  };
+  if (!('IntersectionObserver' in window)) { els.forEach(run); bars.forEach((b) => b.classList.add('is-in')); return; }
+  const io = new IntersectionObserver((es) => {
+    for (const e of es) {
+      if (!e.isIntersecting) continue;
+      if (e.target.dataset.count !== undefined) run(e.target); else e.target.classList.add('is-in');
+      io.unobserve(e.target);
+    }
+  }, { threshold: 0.5 });
+  [...els, ...bars].forEach((el) => io.observe(el));
+}
+
+// ---------------------------------------------------------------- the hero story: say, strike, clean, paste
+function heroStory() {
+  const said = document.querySelector('.hx__said p');
+  const chips = [...document.querySelectorAll('.hx__chip')];
+  const out = document.querySelector('.hx__out');
+  if (!said || !out || reduced) return;
+  const html = said.innerHTML;
+  const strikes = () => [...said.querySelectorAll('s')];
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const text = said.textContent;
+  let alive = true;
+  document.addEventListener('visibilitychange', () => { alive = !document.hidden; });
+
+  async function cycle() {
+    // 1. the words arrive as they are spoken
+    said.innerHTML = '';
+    chips.forEach((c) => c.classList.remove('is-on'));
+    out.classList.remove('is-on');
+    for (let i = 1; i <= text.length; i += 2) {
+      said.textContent = text.slice(0, i);
+      await wait(28);
+    }
+    said.innerHTML = html;
+    strikes().forEach((s) => s.classList.remove('is-struck'));
+    await wait(500);
+    // 2. each fix is struck through and named
+    const ss = strikes();
+    for (let i = 0; i < ss.length; i++) {
+      ss[i].classList.add('is-struck');
+      if (chips[i]) chips[i].classList.add('is-on');
+      await wait(750);
+    }
+    // 3. the clean text is pasted
+    out.classList.add('is-on');
+    await wait(4200);
+  }
+  (async () => {
+    root.classList.add('hx-live');
+    for (;;) {
+      if (alive) await cycle(); else await wait(500);
+    }
+  })();
+}
+
+// ---------------------------------------------------------------- the mode tabs write their text in
+function modeTyping() {
+  if (reduced) return;
+  document.querySelectorAll('#modalita [role="tab"]').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const id = (tab.getAttribute('aria-controls') || '').split(' ').find((x) => x.startsWith('s-'));
+      const screen = id && document.getElementById(id);
+      const target = screen && screen.querySelector('.mx__out');
+      if (!target) return;
+      const blocks = [...target.querySelectorAll('p, li')];
+      const texts = blocks.map((b) => b.textContent);
+      blocks.forEach((b) => { b.textContent = ''; });
+      let bi = 0, ci = 0;
+      const tick = () => {
+        if (bi >= blocks.length) return;
+        ci += 2;
+        blocks[bi].textContent = texts[bi].slice(0, ci);
+        if (ci >= texts[bi].length) { bi += 1; ci = 0; }
+        setTimeout(tick, 18);
+      };
+      setTimeout(tick, 120);
+    });
+  });
+}
+
+// ---------------------------------------------------------------- a light that follows the pointer on panels
+function cardLight() {
+  if (reduced || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  document.querySelectorAll('.panel, .frame, .app.ui').forEach((el) => {
+    el.classList.add('has-light');
+    el.addEventListener('pointermove', (e) => {
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--lx', `${e.clientX - r.left}px`);
+      el.style.setProperty('--ly', `${e.clientY - r.top}px`);
+    });
+  });
+}
+
+reveals();
+counters();
+heroStory();
+modeTyping();
+cardLight();

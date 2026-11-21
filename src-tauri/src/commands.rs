@@ -582,6 +582,12 @@ pub fn palette_run(p: P, instruction: String) {
     p.palette_run(instruction);
 }
 
+/// Adatta l'altezza della barra ai comandi mostrati.
+#[tauri::command]
+pub fn palette_resize(app: AppHandle, height: f64) {
+    crate::palette::resize(&app, height);
+}
+
 /// Chiude la barra senza comando.
 #[tauri::command]
 pub fn palette_cancel(p: P) {

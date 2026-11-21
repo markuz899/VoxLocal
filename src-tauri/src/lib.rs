@@ -119,6 +119,7 @@ pub fn run() {
             commands::palette_data,
             commands::palette_run,
             commands::palette_cancel,
+            commands::palette_resize,
             commands::ask,
             commands::ask_target,
             commands::calendar_access,

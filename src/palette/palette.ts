@@ -59,6 +59,10 @@ function render() {
       return li;
     }),
   );
+  $("group").hidden = shown.length === 0;
+  // la finestra segue la scheda: niente spazio vuoto sotto la lista
+  const height = document.querySelector(".card")?.scrollHeight ?? 0;
+  if (height) invoke("palette_resize", { height });
 }
 
 field.addEventListener("input", () => {

@@ -35,6 +35,13 @@ pub fn show(app: &AppHandle) {
     });
 }
 
+/// La barra alta quanto i comandi mostrati (la pagina misura la scheda e la chiede).
+pub fn resize(app: &AppHandle, height: f64) {
+    if let Some(w) = app.get_webview_window(LABEL) {
+        let _ = w.set_size(tauri::LogicalSize::new(WIDTH, height.clamp(80.0, HEIGHT)));
+    }
+}
+
 pub fn close(app: &AppHandle) {
     let app2 = app.clone();
     let _ = app.run_on_main_thread(move || {

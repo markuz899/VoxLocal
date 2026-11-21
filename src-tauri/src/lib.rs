@@ -100,6 +100,7 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_store::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(shortcuts)
@@ -110,6 +111,13 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updater::Pending::default())
         .invoke_handler(tauri::generate_handler![
+            commands::pick_media_file,
+            commands::transcribe_file,
+            commands::cancel_file,
+            commands::summarize,
+            commands::save_text_file,
+            commands::export_settings,
+            commands::import_settings,
             commands::get_settings,
             commands::save_settings,
             commands::list_input_devices,

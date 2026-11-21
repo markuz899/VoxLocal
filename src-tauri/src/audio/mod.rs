@@ -238,6 +238,76 @@ pub fn read_wav(path: &std::path::Path) -> Result<AudioBuffer> {
     })
 }
 
+/// Decodifica un file audio o video (mp3, m4a/aac, mp4/mov, mkv, wav, flac, ogg vorbis, caf, aiff)
+/// in mono, alla frequenza originale. `on_progress` riceve la frazione letta (0..1).
+// ponytail: niente Opus (i vocali WhatsApp .opus): symphonia non lo decodifica; aggiungere
+// un decoder Opus se i clienti lo chiedono.
+pub fn decode_file(path: &std::path::Path) -> Result<AudioBuffer> {
+    use symphonia::core::codecs::audio::AudioDecoderOptions;
+    use symphonia::core::errors::Error;
+    use symphonia::core::formats::probe::Hint;
+    use symphonia::core::formats::{FormatOptions, TrackType};
+    use symphonia::core::io::MediaSourceStream;
+    use symphonia::core::meta::MetadataOptions;
+
+    let file =
+        std::fs::File::open(path).with_context(|| format!("apertura di {}", path.display()))?;
+    let mss = MediaSourceStream::new(Box::new(file), Default::default());
+    let mut hint = Hint::new();
+    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        hint.with_extension(ext);
+    }
+    let mut format = symphonia::default::get_probe()
+        .probe(
+            &hint,
+            mss,
+            FormatOptions::default(),
+            MetadataOptions::default(),
+        )
+        .map_err(|e| anyhow!("formato non supportato: {e}"))?;
+    let track = format
+        .default_track(TrackType::Audio)
+        .ok_or_else(|| anyhow!("il file non ha una traccia audio"))?;
+    let track_id = track.id;
+    let params = track
+        .codec_params
+        .as_ref()
+        .and_then(|p| p.audio())
+        .ok_or_else(|| anyhow!("traccia audio non leggibile"))?;
+    let mut decoder = symphonia::default::get_codecs()
+        .make_audio_decoder(params, &AudioDecoderOptions::default())
+        .map_err(|e| anyhow!("codec non supportato: {e}"))?;
+
+    let mut out = Vec::new();
+    let mut rate = 0;
+    let mut frame: Vec<f32> = Vec::new();
+    while let Some(packet) = format.next_packet().map_err(|e| anyhow!("lettura: {e}"))? {
+        if packet.track_id != track_id {
+            continue;
+        }
+        let buf = match decoder.decode(&packet) {
+            Ok(buf) => buf,
+            Err(Error::DecodeError(_)) => continue,
+            Err(e) => return Err(anyhow!("decodifica: {e}")),
+        };
+        rate = buf.spec().rate();
+        let channels = buf.spec().channels().count().max(1);
+        frame.resize(buf.samples_interleaved(), 0.0);
+        buf.copy_to_slice_interleaved(&mut frame);
+        // Mono: media dei canali.
+        out.extend(
+            frame
+                .chunks_exact(channels)
+                .map(|c| c.iter().sum::<f32>() / channels as f32),
+        );
+    }
+    anyhow::ensure!(!out.is_empty() && rate > 0, "il file non contiene audio");
+    Ok(AudioBuffer {
+        samples: out,
+        sample_rate: rate,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -283,5 +353,32 @@ mod tests {
             out.samples.len()
         );
         assert!((out.rms() - std::f32::consts::FRAC_1_SQRT_2).abs() < 0.05);
+    }
+
+    #[test]
+    fn decodes_a_stereo_file_to_mono() {
+        let path = std::env::temp_dir().join(format!("voxlocal-decode-{}.wav", std::process::id()));
+        let spec = hound::WavSpec {
+            channels: 2,
+            sample_rate: 44_100,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut w = hound::WavWriter::create(&path, spec).unwrap();
+        for _ in 0..44_100 {
+            w.write_sample(i16::MAX / 2).unwrap();
+            w.write_sample(0i16).unwrap();
+        }
+        w.finalize().unwrap();
+        let buf = decode_file(&path).unwrap();
+        let _ = std::fs::remove_file(&path);
+        assert_eq!(buf.sample_rate, 44_100);
+        assert_eq!(buf.samples.len(), 44_100);
+        assert!(
+            (buf.samples[100] - 0.25).abs() < 0.01,
+            "{}",
+            buf.samples[100]
+        );
+        assert!(decode_file(std::path::Path::new("/nonexistent.mp3")).is_err());
     }
 }

@@ -382,3 +382,138 @@ pub fn app_info(app: AppHandle) -> AppInfo {
         platform: std::env::consts::OS,
     }
 }
+
+/// Estensioni che `audio::decode_file` sa leggere.
+const MEDIA_EXT: &[&str] = &[
+    "mp3", "m4a", "aac", "mp4", "mov", "m4v", "mkv", "webm", "wav", "flac", "ogg", "oga", "caf",
+    "aif", "aiff",
+];
+
+fn pick(app: &AppHandle, name: &str, ext: &[&str]) -> Option<std::path::PathBuf> {
+    use tauri_plugin_dialog::DialogExt;
+    app.dialog()
+        .file()
+        .add_filter(name, ext)
+        .blocking_pick_file()
+        .and_then(|f| f.into_path().ok())
+}
+
+fn save_to(app: &AppHandle, default_name: &str, ext: &str) -> Option<std::path::PathBuf> {
+    use tauri_plugin_dialog::DialogExt;
+    app.dialog()
+        .file()
+        .set_file_name(default_name)
+        .add_filter(ext, &[ext])
+        .blocking_save_file()
+        .and_then(|f| f.into_path().ok())
+}
+
+/// Finestra di scelta di un file audio o video; `None` se l'utente annulla.
+#[tauri::command]
+pub async fn pick_media_file(app: AppHandle) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || pick(&app, "Audio / video", MEDIA_EXT))
+        .await
+        .ok()
+        .flatten()
+        .map(|p| p.to_string_lossy().into_owned())
+}
+
+#[tauri::command]
+pub fn transcribe_file(p: P, path: String) -> R<()> {
+    let path = std::path::PathBuf::from(path);
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(str::to_lowercase)
+        .unwrap_or_default();
+    if ext == "opus" {
+        return Err("Opus files (WhatsApp voice notes) are not supported yet.".into());
+    }
+    p.transcribe_file(path).map_err(err)
+}
+
+#[tauri::command]
+pub fn cancel_file(p: P) {
+    p.cancel_file();
+}
+
+#[tauri::command]
+pub async fn summarize(p: P<'_>, text: String) -> R<String> {
+    p.summarize(&text).await.map_err(|e| format!("{e:#}"))
+}
+
+/// Salva un testo in un file scelto dall'utente; restituisce il percorso, `None` se annulla.
+#[tauri::command]
+pub async fn save_text_file(app: AppHandle, name: String, text: String) -> R<Option<String>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(path) = save_to(&app, &name, "txt") else {
+            return Ok(None);
+        };
+        std::fs::write(&path, text).map_err(err)?;
+        Ok(Some(path.to_string_lossy().into_owned()))
+    })
+    .await
+    .map_err(err)?
+}
+
+/// Esporta vocabolario, snippet, modalità personali e regole per app in un file JSON.
+#[tauri::command]
+pub async fn export_settings(app: AppHandle, p: P<'_>) -> R<Option<String>> {
+    let mut bundle = p.storage.export_bundle().map_err(err)?;
+    bundle.app_modes = p
+        .settings()
+        .app_modes
+        .into_iter()
+        .map(|r| (r.app, r.mode))
+        .collect();
+    let json = serde_json::to_string_pretty(&bundle).map_err(err)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(path) = save_to(&app, "voxlocal-settings.json", "json") else {
+            return Ok(None);
+        };
+        std::fs::write(&path, json).map_err(err)?;
+        Ok(Some(path.to_string_lossy().into_owned()))
+    })
+    .await
+    .map_err(err)?
+}
+
+#[derive(Serialize)]
+pub struct ImportResult {
+    terms: usize,
+    snippets: usize,
+    modes: usize,
+    app_rules: usize,
+}
+
+/// Importa un file esportato, unendolo a quello che c'è. `None` se l'utente annulla.
+#[tauri::command]
+pub async fn import_settings(app: AppHandle, p: P<'_>) -> R<Option<ImportResult>> {
+    let Some(path) =
+        tauri::async_runtime::spawn_blocking(move || pick(&app, "VoxLocal", &["json"]))
+            .await
+            .map_err(err)?
+    else {
+        return Ok(None);
+    };
+    let bundle: crate::storage::Bundle =
+        serde_json::from_str(&std::fs::read_to_string(&path).map_err(err)?)
+            .map_err(|_| "This is not a VoxLocal settings file.".to_string())?;
+    let [terms, snippets, modes] = p.storage.import_bundle(&bundle).map_err(err)?;
+    // Regole per app: quelle del file sostituiscono quelle con lo stesso nome di app.
+    let mut s = p.settings();
+    for (app, mode) in &bundle.app_modes {
+        s.app_modes.retain(|r| !r.app.eq_ignore_ascii_case(app));
+        s.app_modes.push(crate::settings::AppMode {
+            app: app.clone(),
+            mode: mode.clone(),
+        });
+    }
+    p.apply_settings(s).map_err(|e| format!("{e:#}"))?;
+    Ok(Some(ImportResult {
+        terms,
+        snippets,
+        modes,
+        app_rules: bundle.app_modes.len(),
+    }))
+}

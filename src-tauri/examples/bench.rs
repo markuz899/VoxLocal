@@ -83,7 +83,7 @@ async fn main() -> Result<()> {
         ..Default::default()
     };
     for f in &files {
-        let raw = audio::read_wav(f)?;
+        let raw = audio::decode_file(f)?;
         let secs = raw.duration_ms() as f64 / 1000.0;
         let t = Instant::now();
         let pcm = audio::to_16k(raw)?;

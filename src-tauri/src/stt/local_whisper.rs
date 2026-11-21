@@ -116,6 +116,39 @@ impl LocalWhisper {
         audio: &AudioBuffer,
         opts: &SttOptions,
     ) -> Result<Transcript> {
+        let (segments, language) = self.run(audio, opts, None)?;
+        let text = segments
+            .into_iter()
+            .map(|s| s.text)
+            .collect::<Vec<_>>()
+            .join(" ");
+        Ok(Transcript {
+            text: drop_repeated_sentences(&text),
+            language,
+        })
+    }
+
+    /// Trascrizione lunga (file, riunioni) a segmenti con l'orario; `on_progress` riceve 0..100.
+    pub fn transcribe_segments(
+        &self,
+        audio: &AudioBuffer,
+        opts: &SttOptions,
+        on_progress: impl FnMut(i32) + 'static,
+    ) -> Result<(Vec<Segment>, Option<String>)> {
+        let (mut segments, language) = self.run(audio, opts, Some(Box::new(on_progress)))?;
+        for s in &mut segments {
+            s.text = drop_repeated_sentences(&s.text);
+        }
+        segments.dedup_by(|b, a| a.text.len() > 20 && a.text == b.text);
+        Ok((segments, language))
+    }
+
+    fn run(
+        &self,
+        audio: &AudioBuffer,
+        opts: &SttOptions,
+        progress: Option<Box<dyn FnMut(i32)>>,
+    ) -> Result<(Vec<Segment>, Option<String>)> {
         if audio.sample_rate != WHISPER_RATE {
             bail!(
                 "whisper vuole audio a 16 kHz, ricevuto {} Hz",
@@ -131,7 +164,11 @@ impl LocalWhisper {
             p.set_initial_prompt(prompt);
         }
         p.set_no_context(true);
-        p.set_no_timestamps(true);
+        // I segmenti con l'orario servono solo alla trascrizione lunga.
+        p.set_no_timestamps(progress.is_none());
+        if let Some(cb) = progress {
+            p.set_progress_callback_safe(cb);
+        }
         let min_ctx = self
             .inner
             .min_ctx
@@ -160,13 +197,18 @@ impl LocalWhisper {
             }
         })?;
 
-        let text = state
+        // whisper misura il tempo in centesimi di secondo.
+        let segments: Vec<Segment> = state
             .as_iter()
-            .filter_map(|s| s.to_str_lossy().ok().map(|c| c.trim().to_string()))
-            .filter(|t| !t.is_empty())
-            .collect::<Vec<_>>()
-            .join(" ");
-        let text = drop_repeated_sentences(&text);
+            .filter_map(|s| {
+                let text = s.to_str_lossy().ok()?.trim().to_string();
+                (!text.is_empty()).then(|| Segment {
+                    start_ms: s.start_timestamp().max(0) as u64 * 10,
+                    end_ms: s.end_timestamp().max(0) as u64 * 10,
+                    text,
+                })
+            })
+            .collect();
         let language =
             whisper_rs::get_lang_str(state.full_lang_id_from_state()).map(str::to_string);
 
@@ -176,8 +218,15 @@ impl LocalWhisper {
         if *self.inner.keep_warm.lock().unwrap() == Some(Duration::ZERO) {
             self.unload();
         }
-        Ok(Transcript { text, language })
+        Ok((segments, language))
     }
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Segment {
+    pub start_ms: u64,
+    pub end_ms: u64,
+    pub text: String,
 }
 
 /// Whisper elabora sempre 30 s (1500 frame dell'encoder, 50 al secondo) anche per 2 s di parlato.
@@ -246,5 +295,46 @@ mod repeat_tests {
             d("Prima frase qui ok. Seconda frase diversa ora."),
             "Prima frase qui ok. Seconda frase diversa ora."
         );
+    }
+
+    /// Trascrizione lunga su un file vero: `VOXLOCAL_LONG_FILE=… VOXLOCAL_MODEL=… cargo test -- --ignored`.
+    #[test]
+    #[ignore]
+    fn long_file_gives_timed_segments_and_progress() {
+        let (Ok(file), Ok(model)) = (
+            std::env::var("VOXLOCAL_LONG_FILE"),
+            std::env::var("VOXLOCAL_MODEL"),
+        ) else {
+            return;
+        };
+        let audio =
+            crate::audio::to_16k(crate::audio::decode_file(file.as_ref()).unwrap()).unwrap();
+        let stt = super::LocalWhisper::new(model.into(), None);
+        let seen = std::sync::Arc::new(std::sync::Mutex::new(vec![]));
+        let s2 = seen.clone();
+        let t = std::time::Instant::now();
+        let (segments, lang) = stt
+            .transcribe_segments(
+                &audio,
+                &super::SttOptions {
+                    language: Some("it".into()),
+                    ..Default::default()
+                },
+                move |p| s2.lock().unwrap().push(p),
+            )
+            .unwrap();
+        println!(
+            "{} s di audio in {:?}, lingua {lang:?}, avanzamento {:?}",
+            audio.duration_ms() / 1000,
+            t.elapsed(),
+            seen.lock().unwrap()
+        );
+        for s in &segments {
+            println!("[{:>6} - {:>6}] {}", s.start_ms, s.end_ms, s.text);
+        }
+        assert!(segments.len() > 3);
+        assert!(segments.windows(2).all(|w| w[0].start_ms <= w[1].start_ms));
+        assert!(segments.last().unwrap().end_ms > audio.duration_ms() / 2);
+        assert!(!seen.lock().unwrap().is_empty());
     }
 }

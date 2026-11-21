@@ -3,7 +3,7 @@
 mod local_whisper;
 mod openai_compat;
 
-pub use local_whisper::LocalWhisper;
+pub use local_whisper::{LocalWhisper, Segment};
 pub use openai_compat::OpenAiCompatibleStt;
 
 use anyhow::Result;

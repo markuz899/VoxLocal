@@ -162,6 +162,37 @@ pub struct Mode {
     pub temperature: f64,
 }
 
+/// Il file di esportazione: `app_modes` lo riempie chi ha accesso alle impostazioni.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct Bundle {
+    pub app: String,
+    pub version: u32,
+    #[serde(default)]
+    pub vocabulary: Vec<String>,
+    #[serde(default)]
+    pub snippets: Vec<BundleSnippet>,
+    #[serde(default)]
+    pub modes: Vec<BundleMode>,
+    /// Coppie (app, slug della modalità).
+    #[serde(default)]
+    pub app_modes: Vec<(String, String)>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BundleSnippet {
+    pub trigger: String,
+    pub text: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct BundleMode {
+    pub slug: String,
+    pub name: String,
+    pub system_prompt: String,
+    pub user_template: String,
+    pub temperature: f64,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Dictation {
     pub mode_id: Option<i64>,
@@ -523,6 +554,67 @@ impl Storage {
             ],
         )?;
         Ok(slug)
+    }
+
+    /// Vocabolario, snippet e modalità create dall'utente, da salvare in un file.
+    pub fn export_bundle(&self) -> Result<Bundle> {
+        Ok(Bundle {
+            app: "voxlocal".into(),
+            version: 1,
+            vocabulary: self.vocabulary()?,
+            snippets: self
+                .snippets()?
+                .into_iter()
+                .map(|s| BundleSnippet {
+                    trigger: s.trigger,
+                    text: s.text,
+                })
+                .collect(),
+            modes: self
+                .modes()?
+                .into_iter()
+                .filter(|m| m.slug.starts_with("custom_"))
+                .map(|m| BundleMode {
+                    slug: m.slug,
+                    name: m.name,
+                    system_prompt: m.system_prompt,
+                    user_template: m.user_template,
+                    temperature: m.temperature,
+                })
+                .collect(),
+            app_modes: vec![],
+        })
+    }
+
+    /// Unisce un file esportato: aggiunge termini e snippet, crea o aggiorna le modalità personali.
+    /// Le modalità predefinite non vengono mai toccate. Restituisce quanti elementi ha importato.
+    pub fn import_bundle(&self, b: &Bundle) -> Result<[usize; 3]> {
+        anyhow::ensure!(b.app == "voxlocal", "non è un file di VoxLocal");
+        anyhow::ensure!(
+            b.version <= 1,
+            "file creato da una versione più nuova di VoxLocal"
+        );
+        for t in &b.vocabulary {
+            if !t.trim().is_empty() {
+                self.add_term(t)?;
+            }
+        }
+        for sn in &b.snippets {
+            self.save_snippet(&sn.trigger, &sn.text)?;
+        }
+        let mut modes = 0;
+        for m in b.modes.iter().filter(|m| m.slug.starts_with("custom_")) {
+            modes += self.conn.lock().unwrap().execute(
+                "INSERT INTO modes (slug, name, system_prompt, user_template, temperature, builtin, sort)
+                 VALUES (?1, ?2, ?3, ?4, ?5, 0, 100)
+                 ON CONFLICT(slug) DO UPDATE SET name = excluded.name,
+                   system_prompt = excluded.system_prompt, user_template = excluded.user_template,
+                   temperature = excluded.temperature
+                 WHERE builtin = 0",
+                params![m.slug, m.name, m.system_prompt, m.user_template, m.temperature],
+            )?;
+        }
+        Ok([b.vocabulary.len(), b.snippets.len(), modes])
     }
 
     /// Cancella una modalità personalizzata; quelle predefinite si possono solo ripristinare.
@@ -1047,6 +1139,54 @@ mod tests {
             .unwrap(); // aggiorna, non duplica
         assert_eq!(s.snippets().unwrap().len(), 1);
         assert!(s.save_snippet(" . ", "x").is_err());
+    }
+
+    #[test]
+    fn bundle_round_trip_keeps_builtins_untouched() {
+        let a = Storage::in_memory().unwrap();
+        a.add_term("Kubernetes").unwrap();
+        a.save_snippet("my address", "Via Roma").unwrap();
+        let slug = a
+            .create_mode_with_task("Pirate", "Talk like a pirate.")
+            .unwrap();
+        let mut bundle = a.export_bundle().unwrap();
+        assert_eq!(bundle.modes.len(), 1);
+        // Un file che prova a riscrivere una modalità predefinita viene ignorato su quella.
+        let clean = a.mode("clean").unwrap().unwrap();
+        bundle.modes.push(BundleMode {
+            slug: "clean".into(),
+            name: "hacked".into(),
+            system_prompt: "x".into(),
+            user_template: "x".into(),
+            temperature: 1.0,
+        });
+        let json = serde_json::to_string(&bundle).unwrap();
+
+        let b = Storage::in_memory().unwrap();
+        let counts = b
+            .import_bundle(&serde_json::from_str(&json).unwrap())
+            .unwrap();
+        assert_eq!(counts, [1, 1, 1]);
+        assert_eq!(b.vocabulary().unwrap(), vec!["Kubernetes"]);
+        assert_eq!(
+            b.snippet_for("My address").unwrap().as_deref(),
+            Some("Via Roma")
+        );
+        assert_eq!(b.mode(&slug).unwrap().unwrap().name, "Pirate");
+        assert_eq!(
+            b.mode("clean").unwrap().unwrap().system_prompt,
+            clean.system_prompt
+        );
+        // Reimportare non duplica nulla.
+        b.import_bundle(&serde_json::from_str(&json).unwrap())
+            .unwrap();
+        assert_eq!(b.modes().unwrap().len(), a.modes().unwrap().len());
+        assert!(b
+            .import_bundle(&Bundle {
+                app: "other".into(),
+                ..bundle
+            })
+            .is_err());
     }
 
     #[test]

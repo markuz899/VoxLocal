@@ -32,6 +32,27 @@ export interface Settings {
   vocab_dismissed: string[];
 }
 
+export interface Segment {
+  start_ms: number;
+  end_ms: number;
+  text: string;
+}
+
+export interface FileDone {
+  segments: Segment[];
+  language: string | null;
+  duration_ms: number;
+  /** "cancelled" se annullata dall'utente. */
+  error: string | null;
+}
+
+export interface ImportResult {
+  terms: number;
+  snippets: number;
+  modes: number;
+  app_rules: number;
+}
+
 export interface Snippet {
   id: number;
   trigger: string;
@@ -206,6 +227,14 @@ export const api = {
   deleteDictation: (id: number) => invoke<void>("delete_dictation", { id }),
   clearHistory: () => invoke<number>("clear_history"),
   copyText: (text: string) => invoke<void>("copy_text", { text }),
+  pickMediaFile: () => invoke<string | null>("pick_media_file"),
+  transcribeFile: (path: string) => invoke<void>("transcribe_file", { path }),
+  cancelFile: () => invoke<void>("cancel_file"),
+  summarize: (text: string) => invoke<string>("summarize", { text }),
+  saveTextFile: (name: string, text: string) =>
+    invoke<string | null>("save_text_file", { name, text }),
+  exportSettings: () => invoke<string | null>("export_settings"),
+  importSettings: () => invoke<ImportResult | null>("import_settings"),
   permissionsStatus: () => invoke<PermissionStatus>("permissions_status"),
   requestMicrophone: () => invoke<Access>("request_microphone"),
   requestAccessibility: () => invoke<void>("request_accessibility"),
@@ -245,6 +274,15 @@ export const events = {
     ),
   settingsChanged: (cb: (s: Settings) => void) =>
     listen<Settings>("settings://changed", (e) => cb(e.payload)),
+  fileProgress: (
+    cb: (p: { stage: "decode" | "transcribe"; pct: number }) => void,
+  ) =>
+    listen<{ stage: "decode" | "transcribe"; pct: number }>(
+      "file://progress",
+      (e) => cb(e.payload),
+    ),
+  fileDone: (cb: (d: FileDone) => void) =>
+    listen<FileDone>("file://done", (e) => cb(e.payload)),
   navigate: (cb: (section: string) => void) =>
     listen<string>("navigate", (e) => cb(e.payload)),
 };

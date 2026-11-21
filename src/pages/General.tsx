@@ -170,6 +170,56 @@ export default function General() {
           />
         </Row>
       </Group>
+      <Backup />
     </>
+  );
+}
+
+/** Esporta e importa vocabolario, snippet, modalità personali e regole per app. */
+function Backup() {
+  const t = useT();
+  const [notice, setNotice] = useState<{
+    text: string;
+    tone: "ok" | "error";
+  } | null>(null);
+  const run = async (f: () => Promise<string | null>) => {
+    setNotice(null);
+    try {
+      const text = await f();
+      if (text) setNotice({ text, tone: "ok" });
+    } catch (e) {
+      setNotice({ text: errorText(e), tone: "error" });
+    }
+  };
+  return (
+    <Group title={t("backup.title")}>
+      <Row label={t("backup.label")} hint={t("backup.hint")}>
+        <Button
+          onClick={() =>
+            run(async () => {
+              const path = await api.exportSettings();
+              return path ? t("backup.exported", { path }) : null;
+            })
+          }
+        >
+          {t("backup.export")}
+        </Button>
+        <Button
+          onClick={() =>
+            run(async () => {
+              const r = await api.importSettings();
+              return r ? t("backup.imported", { ...r }) : null;
+            })
+          }
+        >
+          {t("backup.import")}
+        </Button>
+      </Row>
+      {notice && (
+        <div className="px-4 pb-3">
+          <Notice tone={notice.tone} text={notice.text} />
+        </div>
+      )}
+    </Group>
   );
 }

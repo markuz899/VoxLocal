@@ -325,6 +325,38 @@ const en = {
   "history.addToVocab": "Add the selection to the vocabulary",
   "history.addedToVocab": "“{term}” added to the vocabulary.",
   "history.selectFirst": "Select a word in the text first.",
+  // files
+  "nav.files": "Transcribe a file",
+  "files.title": "Transcribe a file",
+  "files.description":
+    "Turn a recording into text on this computer: a meeting, a lecture, an interview, a video. Then copy it, save it or get a summary with next steps.",
+  "files.drop": "Drop an audio or video file here",
+  "files.formats":
+    "MP3, M4A, MP4, MOV, MKV, WAV, FLAC, OGG. WhatsApp voice notes (.opus) are not supported yet.",
+  "files.choose": "Choose a file",
+  "files.reading": "Reading the file…",
+  "files.transcribing": "Transcribing… {pct}%",
+  "files.cancelled": "Transcription cancelled.",
+  "files.noSpeech": "No speech found in this file.",
+  "files.showTimes": "Show times",
+  "files.hideTimes": "Hide times",
+  "files.copy": "Copy",
+  "files.copied": "Copied.",
+  "files.save": "Save as text",
+  "files.saved": "Saved to {path}",
+  "files.summarize": "Summarize",
+  "files.summarizing": "Summarizing…",
+  "files.summary": "Summary",
+  // backup
+  "backup.title": "Backup",
+  "backup.label": "Settings file",
+  "backup.hint":
+    "Vocabulary, snippets, your modes and app rules in one file, for another computer or a colleague. Importing adds to what you have.",
+  "backup.export": "Export",
+  "backup.import": "Import",
+  "backup.exported": "Saved to {path}",
+  "backup.imported":
+    "Imported {terms} terms, {snippets} snippets, {modes} modes and {app_rules} app rules.",
 };
 
 type Key = keyof typeof en;
@@ -643,6 +675,36 @@ const it: Record<Key, string> = {
   "history.addToVocab": "Aggiungi la selezione al vocabolario",
   "history.addedToVocab": "“{term}” aggiunto al vocabolario.",
   "history.selectFirst": "Seleziona prima una parola nel testo.",
+  "nav.files": "Trascrivi un file",
+  "files.title": "Trascrivi un file",
+  "files.description":
+    "Trasforma una registrazione in testo su questo computer: una riunione, una lezione, un'intervista, un video. Poi copialo, salvalo o fatti fare un riassunto con le cose da fare.",
+  "files.drop": "Trascina qui un file audio o video",
+  "files.formats":
+    "MP3, M4A, MP4, MOV, MKV, WAV, FLAC, OGG. I vocali WhatsApp (.opus) non sono ancora supportati.",
+  "files.choose": "Scegli un file",
+  "files.reading": "Leggo il file…",
+  "files.transcribing": "Trascrivo… {pct}%",
+  "files.cancelled": "Trascrizione annullata.",
+  "files.noSpeech": "In questo file non c'è parlato.",
+  "files.showTimes": "Mostra gli orari",
+  "files.hideTimes": "Nascondi gli orari",
+  "files.copy": "Copia",
+  "files.copied": "Copiato.",
+  "files.save": "Salva come testo",
+  "files.saved": "Salvato in {path}",
+  "files.summarize": "Riassumi",
+  "files.summarizing": "Riassumo…",
+  "files.summary": "Riassunto",
+  "backup.title": "Backup",
+  "backup.label": "File delle impostazioni",
+  "backup.hint":
+    "Vocabolario, snippet, le tue modalità e le regole per app in un file, per un altro computer o un collega. Importare aggiunge a quello che hai.",
+  "backup.export": "Esporta",
+  "backup.import": "Importa",
+  "backup.exported": "Salvato in {path}",
+  "backup.imported":
+    "Importati {terms} termini, {snippets} snippet, {modes} modalità e {app_rules} regole per app.",
 };
 
 export type Lang = "en" | "it";
@@ -875,6 +937,14 @@ export const FAQ: Record<
         "Statistics shows the words you dictated, your speaking speed and the time saved compared with typing, measured on your own dictations.",
       ],
       [
+        "Can I transcribe a recording?",
+        "Yes. In Transcribe a file, drop an audio or video file: it is transcribed on this computer with times, and you can save it or get a summary with next steps. An hour of audio takes about ten minutes on a recent Mac.",
+      ],
+      [
+        "How do I move my settings to another computer?",
+        "In General → Backup, export a file with your vocabulary, snippets, modes and app rules, and import it on the other computer. API keys are never exported.",
+      ],
+      [
         "What if the LLM does not answer?",
         "VoxLocal pastes the transcription anyway after 15 seconds and tells you. A dictation is never lost: it is always in the history.",
       ],
@@ -947,6 +1017,14 @@ export const FAQ: Record<
       [
         "Quanto tempo sto risparmiando?",
         "Le Statistiche mostrano le parole dettate, la velocità con cui parli e il tempo risparmiato rispetto a scrivere, misurati sui tuoi dettati.",
+      ],
+      [
+        "Posso trascrivere una registrazione?",
+        "Sì. In Trascrivi un file trascini un file audio o video: viene trascritto su questo computer con gli orari, e puoi salvarlo o farti fare un riassunto con le cose da fare. Un'ora di audio richiede circa dieci minuti su un Mac recente.",
+      ],
+      [
+        "Come porto le impostazioni su un altro computer?",
+        "In Generale → Backup esporti un file con vocabolario, snippet, modalità e regole per app, e lo importi sull'altro computer. Le chiavi API non vengono mai esportate.",
       ],
       [
         "E se l'LLM non risponde?",

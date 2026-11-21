@@ -199,9 +199,10 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Giorni:** calcolati nel fuso dell'utente, che la UI passa al backend.
 - **Grafico:** barre CSS sottili, colore validato con lo script della skill dataviz su chiaro e scuro, tabella nascosta per gli screen reader.
 
-## D44 — Snippet: solo corrispondenza dell'intero dettato
+## D44 — Snippet: dettato intero o frase dentro il dettato
 - Un dettato che coincide con una frase salvata (minuscole, senza punteggiatura) viene sostituito dal testo e salta le modalità.
-- **Escluso apposta:** l'espansione dentro una frase più lunga, perché sostituirebbe parole dette per altri motivi. Si aggiunge se serve.
+- **Aggiornamento dopo la prova di Marco:** anche la frase dentro un dettato più lungo viene sostituita ("…alle 3, il mio indirizzo." → "…alle 3, <indirizzo>."), confrontando parole intere senza maiuscole né punteggiatura, prima dell'LLM. Le frasi più lunghe hanno la precedenza.
+- **Le correzioni a voce valgono per tutte le modalità:** le regole comuni in coda a qualunque modalità, comprese quelle della libreria o scritte a mano, vengono aggiornate se sono ancora identiche a una versione precedente. La regola dice che vale anche quando il compito chiede di non cambiare le parole: con "Solo correzione grammaticale" Haiku lasciava "alle 4, anzi alle 3".
 
 ## D45 — Correzioni e formattazione a voce nelle regole comuni
 - **Nelle regole di ogni modalità LLM:** chi si corregge ("anzi", "no, volevo dire") viene riscritto con la versione corretta; "a capo", "nuovo paragrafo" e "punto elenco" vengono applicati, non scritti.

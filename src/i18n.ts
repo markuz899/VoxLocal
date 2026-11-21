@@ -779,7 +779,7 @@ export const MODE_LIBRARY: LibraryMode[] = [
       en: "Spelling, grammar and punctuation, nothing else.",
       it: "Ortografia, grammatica e punteggiatura, nient'altro.",
     },
-    task: "Fix only spelling, grammar and punctuation in the dictation. Do not change the wording, the order or the tone. Keep the original language.",
+    task: "Fix only spelling, grammar and punctuation in the dictation. Do not change the wording, the order or the tone, except to drop the words the speaker corrected. Keep the original language.",
   },
   {
     id: "todo",

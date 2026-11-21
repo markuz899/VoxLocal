@@ -356,12 +356,23 @@ impl Pipeline {
             audio_device,
             ..Default::default()
         };
-        // Snippet: se il dettato è esattamente una frase salvata, si incolla il suo testo e basta.
+        // Snippet: se il dettato è esattamente una frase salvata, si incolla il suo testo e basta;
+        // se la frase compare dentro il dettato, viene sostituita prima dell'LLM (che la riceve già scritta).
         let snippet = self.storage.snippet_for(&transcript.text).ok().flatten();
-        if let Some(text) = &snippet {
-            log::info!("snippet: {} caratteri", text.chars().count());
-            d.final_text = text.clone();
-        }
+        let input = match &snippet {
+            Some(text) => {
+                log::info!("snippet: {} caratteri", text.chars().count());
+                text.clone()
+            }
+            None => self
+                .storage
+                .expand_snippets(&transcript.text)
+                .ok()
+                .flatten()
+                .inspect(|_| log::info!("snippet sostituito dentro il dettato"))
+                .unwrap_or_else(|| transcript.text.clone()),
+        };
+        d.final_text = input.clone();
         // Una regola "app → modalità" vince sulla modalità scelta nel menu. Uno snippet salta le modalità.
         let mode_slug = if snippet.is_some() {
             String::new()
@@ -391,7 +402,7 @@ impl Pipeline {
                     .post_process(
                         &mode,
                         &provider,
-                        &d.raw_text,
+                        &input,
                         &language,
                         &vocabulary,
                         &settings,

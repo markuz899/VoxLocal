@@ -152,6 +152,16 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] **Backup:** "Esporta" in Generale crea un JSON. "Importa" su un profilo pulito ripristina vocabolario, snippet, modalità e regole per app; reimportare non crea doppioni.
 - [ ] **Test lungo automatico:** `VOXLOCAL_LONG_FILE=… VOXLOCAL_MODEL=… cargo test --release --lib long_file -- --ignored --nocapture`.
 
+## Note riunioni
+
+- [ ] **Primo avvio:** "Avvia le note della riunione" chiede il permesso Registrazione schermo. Senza permesso registra solo il microfono e lo dice; dopo averlo concesso (e riaperto l'app) registra anche le app.
+- [ ] **Chiamata con le cuffie** (Meet o Zoom, 5 minuti): le righe sono attribuite a "Io" e "Altri" in ordine giusto. "Riassumi" dà decisioni e cose da fare.
+- [ ] **Stessa chiamata con le casse:** le frasi degli altri non compaiono doppie come "Io".
+- [ ] **Dalla barra dei menu:** avvio e stop funzionano; a fine registrazione si apre la pagina Note riunioni con l'avanzamento della trascrizione.
+- [ ] **App chiusa durante la trascrizione:** alla riapertura la riunione risulta "Trascrizione non riuscita", non "in corso" per sempre.
+- [ ] **Elimina:** toglie la riunione e la sua cartella audio in `meetings/`.
+- [ ] **Test automatico:** `VOXLOCAL_MODEL=… cargo test --release --lib meeting_end_to_end -- --ignored --nocapture`.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

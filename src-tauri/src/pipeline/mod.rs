@@ -87,6 +87,8 @@ pub struct Pipeline {
     mic_test: Mutex<Option<Recorder>>,
     /// La trascrizione di file in corso, per poterla annullare.
     file_job: Mutex<Option<CancellationToken>>,
+    /// La riunione che si sta registrando.
+    meeting: Mutex<Option<crate::meeting::Recording>>,
 }
 
 struct Inner {
@@ -121,6 +123,7 @@ impl Pipeline {
             downloading: AtomicBool::new(false),
             mic_test: Mutex::new(None),
             file_job: Mutex::new(None),
+            meeting: Mutex::new(None),
         })
     }
 
@@ -841,6 +844,180 @@ impl Pipeline {
         Ok(())
     }
 
+    /// Inizia a registrare una riunione: il microfono e (su macOS) l'audio delle app.
+    pub fn meeting_start(self: &Arc<Self>) -> Result<MeetingState> {
+        let mut slot = self.meeting.lock().unwrap();
+        anyhow::ensure!(
+            slot.is_none(),
+            "{}",
+            tr(
+                &self.lang(),
+                "A meeting is already being recorded.",
+                "Stai già registrando una riunione."
+            )
+        );
+        let rec = crate::meeting::Recording::start(
+            &crate::meeting::root_dir(),
+            self.settings().audio_device.clone(),
+        )?;
+        if let Some(e) = &rec.system_error {
+            log::warn!("riunione senza audio delle app: {e}");
+        }
+        log::info!("riunione: registrazione avviata in {}", rec.dir.display());
+        *slot = Some(rec);
+        drop(slot);
+        let state = self.meeting_state();
+        let _ = self.app.emit("meeting://state", &state);
+        tray::refresh(&self.app);
+        Ok(state)
+    }
+
+    pub fn meeting_state(&self) -> MeetingState {
+        match self.meeting.lock().unwrap().as_ref() {
+            Some(r) => MeetingState {
+                recording: true,
+                started_at: Some(r.started_at),
+                system_error: r.system_error.clone(),
+                mic_silent: r.mic_silent(),
+            },
+            None => MeetingState::default(),
+        }
+    }
+
+    pub fn meeting_recording(&self) -> bool {
+        self.meeting.lock().unwrap().is_some()
+    }
+
+    /// Ferma la registrazione, salva la riunione e la trascrive in background. Restituisce il suo id.
+    pub async fn meeting_stop(self: &Arc<Self>) -> Result<i64> {
+        let rec = self.meeting.lock().unwrap().take().ok_or_else(|| {
+            anyhow!(
+                "{}",
+                tr(
+                    &self.lang(),
+                    "No meeting is being recorded.",
+                    "Non stai registrando nessuna riunione."
+                )
+            )
+        })?;
+        let tracks = tauri::async_runtime::spawn_blocking(move || rec.stop()).await??;
+        let id = self.storage.insert_meeting(
+            tracks.started_at,
+            tracks.duration_ms as i64,
+            &tracks.dir.to_string_lossy(),
+        )?;
+        let _ = self.app.emit("meeting://state", &MeetingState::default());
+        let _ = self.app.emit("history://changed", 0);
+        tray::refresh(&self.app);
+        log::info!(
+            "riunione {id}: {} s registrati, trascrivo",
+            tracks.duration_ms / 1000
+        );
+        let me = self.clone();
+        tauri::async_runtime::spawn(async move {
+            let res = me.transcribe_meeting(id, &tracks).await;
+            let (lines, error) = match res {
+                Ok(lines) => (
+                    serde_json::to_string(&lines).unwrap_or_else(|_| "[]".into()),
+                    None,
+                ),
+                Err(e) => ("[]".to_string(), Some(format!("{e:#}"))),
+            };
+            if let Some(e) = &error {
+                log::error!("riunione {id}: {e}");
+            }
+            let _ = me.storage.finish_meeting(id, &lines, error.as_deref());
+            let _ = me.app.emit("meeting://done", id);
+        });
+        Ok(id)
+    }
+
+    async fn transcribe_meeting(
+        &self,
+        id: i64,
+        tracks: &crate::meeting::Tracks,
+    ) -> Result<Vec<crate::meeting::Line>> {
+        let settings = self.settings();
+        let vocabulary = self.storage.vocabulary().unwrap_or_default();
+        let parts: Vec<_> = [tracks.me.clone(), tracks.others.clone()]
+            .into_iter()
+            .collect();
+        let mut out: [Vec<crate::stt::Segment>; 2] = [vec![], vec![]];
+        let mut audios: [Option<crate::audio::AudioBuffer>; 2] = [None, None];
+        for (k, path) in parts.into_iter().enumerate() {
+            let Some(path) = path else { continue };
+            let audio =
+                tauri::async_runtime::spawn_blocking(move || crate::meeting::read_track(&path))
+                    .await??;
+            if audio.rms() < 0.002 {
+                continue; // una traccia muta (microfono silenziato, nessuno dalle app): niente da trascrivere
+            }
+            let opts = SttOptions {
+                language: settings.language(),
+                initial_prompt: (!vocabulary.is_empty()).then(|| vocabulary.join(", ")),
+                cancel: CancellationToken::new(),
+            };
+            let (stt, app) = (self.stt.clone(), self.app.clone());
+            let audio2 = audio.clone();
+            let (segments, _) = tauri::async_runtime::spawn_blocking(move || {
+                stt.transcribe_segments(&audio2, &opts, move |pct| {
+                    let _ = app.emit(
+                        "meeting://progress",
+                        MeetingProgress {
+                            id,
+                            pct: (k as i32 * 100 + pct) / 2,
+                        },
+                    );
+                })
+            })
+            .await??;
+            out[k] = crate::meeting::keep_spoken(segments, &audio);
+            audios[k] = Some(audio);
+        }
+        let [mut me, others] = out;
+        // con le casse il microfono riprende le app: si toglie confrontando il suono delle due tracce
+        if let [Some(mic), Some(apps)] = &audios {
+            let before = me.len();
+            me = crate::meeting::drop_acoustic_echo(me, mic, apps);
+            log::info!(
+                "riunione {id}: {} segmenti del microfono tolti come eco",
+                before - me.len()
+            );
+        }
+        Ok(crate::meeting::merge(me, others))
+    }
+
+    /// Riassunto, decisioni e cose da fare di una riunione trascritta; viene salvato con la riunione.
+    pub async fn summarize_meeting(&self, id: i64) -> Result<String> {
+        let m = self
+            .storage
+            .meeting(id)?
+            .ok_or_else(|| anyhow!("riunione {id} non trovata"))?;
+        let lines: Vec<crate::meeting::Line> = serde_json::from_value(m.lines)?;
+        anyhow::ensure!(
+            !lines.is_empty(),
+            "{}",
+            tr(
+                &self.lang(),
+                "This meeting has no transcript.",
+                "Questa riunione non ha trascrizione."
+            )
+        );
+        let lang = self.lang();
+        let text =
+            crate::meeting::as_text(&lines, tr(&lang, "Me", "Io"), tr(&lang, "Others", "Altri"));
+        let summary = self.summarize(&text).await?;
+        self.storage.set_meeting_summary(id, &summary)?;
+        Ok(summary)
+    }
+
+    pub fn delete_meeting(&self, id: i64) -> Result<()> {
+        if let Some(dir) = self.storage.delete_meeting(id)? {
+            crate::meeting::remove_dir(std::path::Path::new(&dir))?;
+        }
+        Ok(())
+    }
+
     pub fn cancel_file(&self) {
         if let Some(c) = self.file_job.lock().unwrap().as_ref() {
             c.cancel();
@@ -1069,4 +1246,20 @@ struct FileDone {
     language: Option<String>,
     duration_ms: u64,
     error: Option<String>,
+}
+
+#[derive(Clone, Serialize, Default)]
+pub struct MeetingState {
+    pub recording: bool,
+    pub started_at: Option<i64>,
+    /// Perché l'audio delle app non si registra (permesso, sistema): si registra solo il microfono.
+    pub system_error: Option<String>,
+    /// Il microfono manda solo silenzio assoluto: manca il permesso Microfono.
+    pub mic_silent: bool,
+}
+
+#[derive(Clone, Serialize)]
+struct MeetingProgress {
+    id: i64,
+    pct: i32,
 }

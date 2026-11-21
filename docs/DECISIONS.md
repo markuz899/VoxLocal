@@ -228,6 +228,21 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Importazione:** unisce invece di sostituire. Le modalità con lo stesso slug vengono aggiornate, e un file che prova a riscrivere una modalità predefinita viene ignorato su quella (c'è un test). Le regole per app del file vincono su quelle con lo stesso nome di app.
 - **Finestre di dialogo:** aperte dal backend (`tauri-plugin-dialog` da Rust), così il webview non riceve permessi sul file system.
 
+## D49 — Note riunioni: due tracce, "io" e "gli altri"
+- **Due tracce, senza riconoscere le voci:** il microfono è "io", l'audio delle app è "gli altri". Distinguere le singole persone in locale (diarizzazione) è rimandato.
+- **Audio delle app su macOS:** ScreenCaptureKit tramite `objc2-screen-capture-kit`. Il crate `screencapturekit` non compila con Xcode 15: porta un ponte Swift per Metal che usa API di macOS 15.
+  - Si cattura il display principale a 2×2 px, solo per l'audio (48 kHz float, non interleaved).
+  - Serve il permesso Registrazione schermo.
+  - Il filtro vede solo le app aperte all'avvio, quindi si rinnova ogni 10 s.
+  - `addStreamOutput:…` si chiama con `msg_send`, perché il binding lo tiene dietro una feature che non esiste.
+- **Su disco mentre registra:** due WAV a 16 kHz mono 16 bit (circa 115 MB l'ora per traccia), ricampionati con interpolazione lineare a flusso. Le riunioni lunghe non stanno in memoria.
+- **Unione:** dopo la registrazione si trascrivono le due tracce e si tolgono i segmenti sul silenzio, cioè le frasi che Whisper inventa ("Grazie a tutti.").
+  - Un segmento del microfono che si sovrappone per metà a uno degli altri e ne ripete metà delle parole è l'eco delle casse, e si toglie.
+  - Il resto si ordina per tempo.
+- **Riassunto:** l'LLM predefinito con il prompt dei file, sul testo "Io: … / Altri: …", salvato con la riunione.
+- **Windows e Linux:** per ora solo il microfono, e la UI lo dice. Il loopback WASAPI è il prossimo passo.
+- **Prova reale:** frase riprodotta da `afplay`, catturata, trascritta come "Altri" (test `meeting_end_to_end`, ignorato).
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

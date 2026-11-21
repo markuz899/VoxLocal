@@ -4,6 +4,7 @@ mod commands;
 mod context;
 mod i18n;
 pub mod llm;
+pub mod meeting;
 pub mod models;
 mod overlay;
 pub mod paste;
@@ -111,6 +112,15 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(updater::Pending::default())
         .invoke_handler(tauri::generate_handler![
+            commands::meeting_start,
+            commands::meeting_stop,
+            commands::meeting_state,
+            commands::list_meetings,
+            commands::get_meeting,
+            commands::summarize_meeting,
+            commands::rename_meeting,
+            commands::delete_meeting,
+            commands::screen_permission,
             commands::pick_media_file,
             commands::transcribe_file,
             commands::cancel_file,
@@ -170,6 +180,7 @@ pub fn run() {
             let handle = app.handle().clone();
             let settings = settings::load(&handle);
             let storage = Arc::new(storage::Storage::open(&db_path())?);
+            let _ = storage.fail_unfinished_meetings();
             match storage.purge(settings.retention_days) {
                 Ok(n) if n > 0 => log::info!("cronologia: rimossi {n} dettati oltre la retention"),
                 Err(e) => log::error!("pulizia cronologia: {e:#}"),

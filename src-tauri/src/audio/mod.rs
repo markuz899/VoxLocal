@@ -124,6 +124,67 @@ impl Recorder {
     }
 }
 
+/// Microfono a flusso: i campioni (mono, frequenza nativa) vanno a `on_chunk` man mano che arrivano,
+/// senza tenerli in memoria. Serve alle registrazioni lunghe (riunioni).
+pub struct MicStream {
+    stop: Arc<AtomicBool>,
+    handle: JoinHandle<Result<()>>,
+    pub rate: u32,
+}
+
+impl MicStream {
+    pub fn start(
+        device: Option<String>,
+        mut on_chunk: impl FnMut(&[f32]) + Send + 'static,
+    ) -> Result<Self> {
+        let stop = Arc::new(AtomicBool::new(false));
+        let (ready_tx, ready_rx) = mpsc::channel::<Result<u32>>();
+        let stop_t = stop.clone();
+        let handle = std::thread::Builder::new()
+            .name("voxlocal-mic-stream".into())
+            .spawn(move || -> Result<()> {
+                let (stream, mut cons, rate) = match open(device.as_deref()) {
+                    Ok(v) => {
+                        let _ = ready_tx.send(Ok(v.2));
+                        v
+                    }
+                    Err(e) => {
+                        let _ = ready_tx.send(Err(anyhow!("{e:#}")));
+                        return Err(e);
+                    }
+                };
+                let _ = rate;
+                let mut drain = |on_chunk: &mut dyn FnMut(&[f32])| {
+                    let n = cons.slots();
+                    if let Ok(chunk) = cons.read_chunk(n) {
+                        let (a, b) = chunk.as_slices();
+                        on_chunk(a);
+                        on_chunk(b);
+                        chunk.commit_all();
+                    }
+                };
+                while !stop_t.load(Ordering::Relaxed) {
+                    std::thread::sleep(Duration::from_millis(100));
+                    drain(&mut on_chunk);
+                }
+                drop(stream);
+                drain(&mut on_chunk);
+                Ok(())
+            })?;
+        let rate = ready_rx
+            .recv_timeout(Duration::from_secs(2))
+            .context("il microfono non risponde")??;
+        Ok(Self { stop, handle, rate })
+    }
+
+    pub fn stop(self) -> Result<()> {
+        self.stop.store(true, Ordering::Relaxed);
+        self.handle
+            .join()
+            .map_err(|_| anyhow!("thread del microfono andato in panico"))?
+    }
+}
+
 type Opened = (cpal::Stream, rtrb::Consumer<f32>, u32);
 
 /// Nomi dei microfoni disponibili, nell'ordine del sistema.

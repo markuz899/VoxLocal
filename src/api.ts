@@ -46,6 +46,34 @@ export interface FileDone {
   error: string | null;
 }
 
+export interface MeetingState {
+  recording: boolean;
+  started_at: number | null;
+  /** Perché l'audio delle app non si registra: si registra solo il microfono. */
+  system_error: string | null;
+  /** Il microfono manda solo silenzio assoluto: manca il permesso Microfono. */
+  mic_silent: boolean;
+}
+
+export interface MeetingLine {
+  speaker: "me" | "others";
+  start_ms: number;
+  end_ms: number;
+  text: string;
+}
+
+export interface Meeting {
+  id: number;
+  started_at: number;
+  duration_ms: number;
+  title: string;
+  dir: string;
+  status: "transcribing" | "done" | "error";
+  error: string | null;
+  lines: MeetingLine[];
+  summary: string | null;
+}
+
 export interface ImportResult {
   terms: number;
   snippets: number;
@@ -234,6 +262,17 @@ export const api = {
   saveTextFile: (name: string, text: string) =>
     invoke<string | null>("save_text_file", { name, text }),
   exportSettings: () => invoke<string | null>("export_settings"),
+  meetingStart: () => invoke<MeetingState>("meeting_start"),
+  meetingStop: () => invoke<number>("meeting_stop"),
+  meetingState: () => invoke<MeetingState>("meeting_state"),
+  listMeetings: () => invoke<Meeting[]>("list_meetings"),
+  getMeeting: (id: number) => invoke<Meeting | null>("get_meeting", { id }),
+  summarizeMeeting: (id: number) => invoke<string>("summarize_meeting", { id }),
+  renameMeeting: (id: number, title: string) =>
+    invoke<void>("rename_meeting", { id, title }),
+  deleteMeeting: (id: number) => invoke<void>("delete_meeting", { id }),
+  screenPermission: (request: boolean) =>
+    invoke<boolean>("screen_permission", { request }),
   importSettings: () => invoke<ImportResult | null>("import_settings"),
   permissionsStatus: () => invoke<PermissionStatus>("permissions_status"),
   requestMicrophone: () => invoke<Access>("request_microphone"),
@@ -281,6 +320,14 @@ export const events = {
       "file://progress",
       (e) => cb(e.payload),
     ),
+  meetingState: (cb: (s: MeetingState) => void) =>
+    listen<MeetingState>("meeting://state", (e) => cb(e.payload)),
+  meetingProgress: (cb: (p: { id: number; pct: number }) => void) =>
+    listen<{ id: number; pct: number }>("meeting://progress", (e) =>
+      cb(e.payload),
+    ),
+  meetingDone: (cb: (id: number) => void) =>
+    listen<number>("meeting://done", (e) => cb(e.payload)),
   fileDone: (cb: (d: FileDone) => void) =>
     listen<FileDone>("file://done", (e) => cb(e.payload)),
   navigate: (cb: (section: string) => void) =>

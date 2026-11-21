@@ -13,6 +13,7 @@ const PRESETS = {
   it: [
     "Rendilo più formale",
     "Correggi gli errori",
+    "Rispondi in modo cordiale",
     "Accorcialo",
     "Traduci in inglese",
     "Riassumi in tre punti",
@@ -20,6 +21,7 @@ const PRESETS = {
   en: [
     "Make it more formal",
     "Fix the mistakes",
+    "Reply in a friendly way",
     "Make it shorter",
     "Translate into Italian",
     "Summarize in three bullet points",

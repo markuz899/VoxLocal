@@ -1000,7 +1000,7 @@ export const FAQ: Record<
       ],
       [
         "What is the selection command?",
-        "Select some text in any app, hold ⌥⇧ Space (Alt+Shift+Space) and say what to do with it: “make it more formal”, “translate into German”, “turn it into a list”. Tap the shortcut instead of holding it to type the command, or pick a recent one. VoxLocal replaces the selection with the result. It needs an LLM provider.",
+        "Select some text in any app, hold ⌥⇧ Space (Alt+Shift+Space) and say what to do with it: “make it more formal”, “translate into German”, “turn it into a list”. Tap the shortcut instead of holding it to type the command, or pick a recent one. VoxLocal replaces the selection with the result. Starting with “reply…” (“reply that Thursday is fine”) it writes an answer to the selected message instead and copies it, ready to paste. It needs an LLM provider.",
       ],
       [
         "What are modes?",
@@ -1090,7 +1090,7 @@ export const FAQ: Record<
       ],
       [
         "Cos'è il comando sulla selezione?",
-        "Selezioni un testo in qualsiasi app, tieni premuto ⌥⇧ Spazio (Alt+Shift+Spazio) e dici cosa farne: “rendilo più formale”, “traducilo in tedesco”, “fanne un elenco”. Se tocchi la scorciatoia invece di tenerla premuta puoi scrivere il comando, o sceglierne uno recente. VoxLocal sostituisce la selezione con il risultato. Serve un provider LLM.",
+        "Selezioni un testo in qualsiasi app, tieni premuto ⌥⇧ Spazio (Alt+Shift+Spazio) e dici cosa farne: “rendilo più formale”, “traducilo in tedesco”, “fanne un elenco”. Se tocchi la scorciatoia invece di tenerla premuta puoi scrivere il comando, o sceglierne uno recente. VoxLocal sostituisce la selezione con il risultato. Se inizi con “rispondi…” (“rispondi che giovedì va bene”) scrive invece una risposta al messaggio selezionato e la copia, pronta da incollare. Serve un provider LLM.",
       ],
       [
         "Cosa sono le modalità?",

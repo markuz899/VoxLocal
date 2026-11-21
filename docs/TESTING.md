@@ -198,6 +198,12 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] **Copia elenco** incolla una lista Markdown a caselle.
 - [ ] **Riunione senza impegni:** nessuna sezione "Cose da fare".
 
+## Rispondi a un messaggio
+
+- [ ] Seleziona una mail ricevuta in Mail, tieni premuto ⌥⇧ Spazio e di' "rispondi che giovedì va bene": compare l'avviso, ⌘V nella risposta incolla il testo.
+- [ ] Dalla barra (tocco): "Rispondi in modo cordiale" funziona allo stesso modo.
+- [ ] Un comando normale ("rendilo più formale") sostituisce ancora la selezione.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

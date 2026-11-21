@@ -209,6 +209,7 @@ function meetingStory() {
   const prompt = box.querySelector('[data-mt="prompt"]'), yes = box.querySelector('[data-mt="yes"]');
   const lines = [...box.querySelectorAll('[data-mt="line"]')], sum = box.querySelector('[data-mt="sum"]');
   const time = box.querySelector('[data-mt="time"]');
+  const rem = box.querySelector('[data-mt="rem"]');
   const hide = () => { [prompt, ...lines, sum].forEach((e) => e.classList.add('is-hid')); };
   hide();
   whenVisible(box, 'mt-live', async () => {
@@ -231,8 +232,16 @@ function meetingStory() {
     }
     await wait(1100);
     time.textContent = '42:10';
+    rem.classList.remove('is-done');
+    rem.textContent = 'Aggiungi a Promemoria';
     sum.classList.remove('is-hid');
-    await wait(4200);
+    await wait(1600);
+    rem.classList.add('is-press');
+    await wait(180);
+    rem.classList.remove('is-press');
+    rem.classList.add('is-done');
+    rem.textContent = 'Aggiunte a Promemoria: 2';
+    await wait(3400);
   });
 }
 

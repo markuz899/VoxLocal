@@ -138,6 +138,30 @@
   .dg-fallback ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 460px; margin: 0; padding: 0; list-style: none; }
   .dg-fallback li { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgb(255 255 255 / .16); background: rgb(255 255 255 / .06); color: #fff; font-size: 15px; }
 
+
+  /* hero: dictations that appear beside the headline, record, turn into text and fade (assets/site.js) */
+  .hero--centred .hero-text { position: relative; }
+  .hero--centred .hero__c { position: relative; z-index: 1; }
+  .hx-float { position: absolute; left: 0; right: 0; top: 0; height: 440px; pointer-events: none; z-index: 0; }
+  @media (max-width: 1099px) { .hx-float { display: none; } }
+  .hxf { position: absolute; width: 190px; padding: 10px 12px; border-radius: 16px; background: #fff; border: 1px solid rgb(35 35 35 / .1);
+    box-shadow: 0 10px 30px -14px rgb(35 35 35 / .35); font: 400 13px/1.4 var(--font-text); color: #232323;
+    opacity: 0; transform: translateY(10px) scale(.94); transition: opacity .5s ease, transform .6s cubic-bezier(.22,1,.36,1); }
+  .hxf.is-on { opacity: 1; transform: none; }
+  .hxf.is-out { opacity: 0; transform: translateY(-8px) scale(.97); }
+  .hxf__top { display: flex; align-items: center; gap: 8px; color: #686868; }
+  .hxf__dot { width: 8px; height: 8px; border-radius: 50%; background: #e0564e; box-shadow: 0 0 0 3px rgb(224 86 78 / .18); animation: hxf-dot 1s ease-in-out infinite alternate; }
+  .hxf.is-done .hxf__dot { background: #2fbf71; box-shadow: 0 0 0 3px rgb(47 191 113 / .18); animation: none; }
+  @keyframes hxf-dot { to { opacity: .45; } }
+  .hxf__wave { display: flex; align-items: center; gap: 2px; height: 22px; margin-top: 6px; }
+  .hxf__wave i { width: 3px; height: 100%; border-radius: 2px; background: #232323; animation: hx-lv .55s linear infinite alternate; }
+  .hxf__wave i:nth-child(2n) { animation-delay: -.18s; } .hxf__wave i:nth-child(3n) { animation-delay: -.36s; } .hxf__wave i:nth-child(5n) { animation-delay: -.1s; }
+  .hxf__text { margin-top: 6px; }
+  .hxf:not(.is-done) .hxf__text, .hxf:not(.is-done) .hxf__to { display: none; }
+  .hxf.is-done .hxf__wave { display: none; }
+  .hxf__to { display: inline-block; margin-top: 6px; padding: 1px 8px; border-radius: 999px; background: #e4fbef; font-size: 12px; opacity: 0; transition: opacity .3s ease; }
+  .hxf.is-done .hxf__to { opacity: 1; }
+
   /* app-frame (sections-library.md, app-frame) */
   .app.ui { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); margin-top: var(--s-7); background: var(--u-bg); border: 1px solid var(--u-border); border-radius: var(--u-r); box-shadow: var(--u-shadow); }
   .app > .app__pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
@@ -256,6 +280,7 @@
 <main id="top">
   <section class="hero hero--centred" data-enter aria-labelledby="hero-h">
     <div class="wrap"><div class="hero-text">
+      <div class="hx-float" aria-hidden="true"></div>
       <div class="hero__c">
         <a class="pill" href="#registrazioni"><span>Nuovo: trascrive anche le registrazioni</span><span class="muted">MP3, M4A, MP4</span></a>
         <h1 id="hero-h">Dettatura vocale per Mac e Windows</h1>

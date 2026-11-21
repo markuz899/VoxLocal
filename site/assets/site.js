@@ -137,8 +137,61 @@ function cardLight() {
   });
 }
 
+// ---------------------------------------------------------------- dictations floating beside the headline
+function floatingDictations() {
+  const box = document.querySelector('.hx-float');
+  if (!box || reduced || !matchMedia('(min-width: 1100px)').matches) return;
+  const items = [
+    ['Slack', 'Il deploy slitta alle 21, vi aggiorno.'],
+    ['Mail', 'Ciao Sara, il preventivo va bene.'],
+    ['Note', 'Spesa: latte, pane, arance.'],
+    ['Word', 'Il verbale è pronto per la firma.'],
+    ['WhatsApp', 'Arrivo tra dieci minuti.'],
+    ['Teams', 'Riunione spostata a martedì alle 10.'],
+    ['Calendario', 'Dentista giovedì alle 16.'],
+    ['Notion', 'Idee per il lancio di dicembre.'],
+  ];
+  // slots in the empty space at the sides of the headline (left and right columns)
+  const slots = [[0, 4], [0, 38], [0, 70], [1, 12], [1, 46], [1, 76]];
+  const busy = new Set();
+  let n = 0;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function spawn() {
+    const free = slots.map((_, i) => i).filter((i) => !busy.has(i));
+    if (!free.length || document.hidden) return;
+    const si = free[Math.floor(Math.random() * free.length)];
+    busy.add(si);
+    const [side, top] = slots[si];
+    const [app, text] = items[n++ % items.length];
+    const el = document.createElement('div');
+    el.className = 'hxf';
+    el.style.top = `${top}%`;
+    el.style[side ? 'right' : 'left'] = `${8 + Math.round(Math.random() * 24)}px`;
+    el.innerHTML = `<div class="hxf__top"><span class="hxf__dot"></span><span class="hxf__st">Registro…</span><span class="hxf__t">0:00</span></div><div class="hxf__wave">${'<i></i>'.repeat(16)}</div><div class="hxf__text"></div><span class="hxf__to">Incollato in ${app}</span>`;
+    box.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('is-on'));
+    const t = el.querySelector('.hxf__t'), st = el.querySelector('.hxf__st'), out = el.querySelector('.hxf__text');
+    for (let k = 1; k <= 3; k++) { await wait(600); t.textContent = `0:0${k}`; }
+    st.textContent = 'Trascrivo…';
+    el.querySelector('.hxf__wave').style.opacity = '.35';
+    await wait(500);
+    el.classList.add('is-done');
+    st.textContent = 'Trascritto';
+    for (let i = 1; i <= text.length; i++) { out.textContent = text.slice(0, i); await wait(24); }
+    await wait(2200);
+    el.classList.add('is-out');
+    await wait(700);
+    el.remove();
+    busy.delete(si);
+  }
+  spawn();
+  setTimeout(spawn, 900);
+  setInterval(spawn, 1700);
+}
+
 reveals();
 counters();
+floatingDictations();
 heroStory();
 modeTyping();
 cardLight();

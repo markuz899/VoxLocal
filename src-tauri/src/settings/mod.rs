@@ -58,6 +58,8 @@ pub struct Settings {
     pub command_hotkey: String,
     /// Lingua d'arrivo della modalità di traduzione ({{target_language}} nei template).
     pub translate_to: String,
+    /// Parole suggerite per il vocabolario che l'utente ha scartato: non si ripropongono.
+    pub vocab_dismissed: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -94,6 +96,7 @@ impl Default for Settings {
             ui_language: "en".into(),
             command_hotkey: "Alt+Shift+Space".into(),
             translate_to: "en".into(),
+            vocab_dismissed: vec![],
         }
     }
 }

@@ -221,6 +221,52 @@ pub fn remove_term(p: P, term: String) -> R<()> {
 }
 
 #[tauri::command]
+pub fn list_snippets(p: P) -> R<Vec<crate::storage::Snippet>> {
+    p.storage.snippets().map_err(err)
+}
+
+#[tauri::command]
+pub fn save_snippet(p: P, trigger: String, text: String) -> R<()> {
+    p.storage
+        .save_snippet(&trigger, &text)
+        .map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn delete_snippet(p: P, id: i64) -> R<()> {
+    p.storage.delete_snippet(id).map_err(err)
+}
+
+#[tauri::command]
+pub fn get_stats(p: P, since: i64, utc_offset_min: i64, days: usize) -> R<crate::storage::Stats> {
+    p.storage
+        .stats(since, utc_offset_min, days.min(366))
+        .map_err(err)
+}
+
+#[tauri::command]
+pub fn vocabulary_suggestions(p: P) -> R<Vec<(String, i64)>> {
+    let dismissed = p.settings().vocab_dismissed;
+    p.storage
+        .vocabulary_suggestions(&dismissed, 20)
+        .map_err(err)
+}
+
+/// Scarta un suggerimento del vocabolario: non verrà più proposto.
+#[tauri::command]
+pub fn dismiss_suggestion(p: P, term: String) -> R<()> {
+    let mut s = p.settings();
+    if !s
+        .vocab_dismissed
+        .iter()
+        .any(|d| d.eq_ignore_ascii_case(&term))
+    {
+        s.vocab_dismissed.push(term);
+    }
+    p.apply_settings(s).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
 pub fn get_history(
     p: P,
     filter: HistoryFilter,

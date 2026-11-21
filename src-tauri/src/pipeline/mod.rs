@@ -21,8 +21,10 @@ use crate::{models, overlay, paste, settings, tray};
 
 /// Sotto questa durata è un tocco involontario della hotkey.
 const MIN_AUDIO_MS: u64 = 300;
-/// RMS sotto ~-54 dBFS: silenzio, inutile mandarlo a whisper (che allucina sul silenzio).
-const SILENCE_RMS: f32 = 0.002;
+/// Sotto questi valori è silenzio: inutile mandarlo a whisper, che sul silenzio inventa frasi.
+/// Bassi abbastanza da lasciar passare la voce sussurrata, che poi `boost_quiet` amplifica.
+const SILENCE_RMS: f32 = 0.001;
+const SILENCE_PEAK: f32 = 0.015;
 pub const ESC: &str = "Escape";
 
 /// Quale scorciatoia ha avviato la registrazione.
@@ -294,13 +296,21 @@ impl Pipeline {
     ) -> Result<()> {
         let raw = tokio::task::spawn_blocking(move || rec.stop()).await??;
         let audio_ms = raw.duration_ms();
-        if audio_ms < MIN_AUDIO_MS || raw.rms() < SILENCE_RMS {
-            log::info!("scartato: {audio_ms} ms, rms {:.4}", raw.rms());
+        if audio_ms < MIN_AUDIO_MS || raw.rms() < SILENCE_RMS || raw.peak() < SILENCE_PEAK {
+            log::info!(
+                "scartato: {audio_ms} ms, rms {:.4}, picco {:.3}",
+                raw.rms(),
+                raw.peak()
+            );
             return Ok(());
         }
 
         let t = Instant::now();
-        let audio = audio::to_16k(raw)?;
+        let mut audio = audio::to_16k(raw)?;
+        let gain = audio.boost_quiet();
+        if gain > 1.0 {
+            log::info!("voce bassa: guadagno ×{gain:.1}");
+        }
         let resample_ms = t.elapsed().as_millis();
 
         let settings = self.settings();
@@ -346,12 +356,22 @@ impl Pipeline {
             audio_device,
             ..Default::default()
         };
-        // Una regola "app → modalità" vince sulla modalità scelta nel menu.
-        let mode_slug = target_app
-            .as_deref()
-            .and_then(|app| crate::context::mode_for_app(app, &settings.app_modes))
-            .unwrap_or(&settings.active_mode)
-            .to_string();
+        // Snippet: se il dettato è esattamente una frase salvata, si incolla il suo testo e basta.
+        let snippet = self.storage.snippet_for(&transcript.text).ok().flatten();
+        if let Some(text) = &snippet {
+            log::info!("snippet: {} caratteri", text.chars().count());
+            d.final_text = text.clone();
+        }
+        // Una regola "app → modalità" vince sulla modalità scelta nel menu. Uno snippet salta le modalità.
+        let mode_slug = if snippet.is_some() {
+            String::new()
+        } else {
+            target_app
+                .as_deref()
+                .and_then(|app| crate::context::mode_for_app(app, &settings.app_modes))
+                .unwrap_or(&settings.active_mode)
+                .to_string()
+        };
 
         // Post-processing LLM: qualunque errore → si incolla il testo grezzo (mai perdere il dettato).
         if let Some(mode) = self.storage.mode(&mode_slug).ok().flatten() {

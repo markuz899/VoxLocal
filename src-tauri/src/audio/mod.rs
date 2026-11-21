@@ -31,6 +31,24 @@ impl AudioBuffer {
     pub fn rms(&self) -> f32 {
         rms(&self.samples)
     }
+
+    pub fn peak(&self) -> f32 {
+        self.samples.iter().fold(0.0_f32, |m, s| m.max(s.abs()))
+    }
+
+    /// Voce bassa o sussurrata: porta il picco verso 0,7 (al massimo ×12), così whisper sente le
+    /// parole invece del rumore. Restituisce il guadagno applicato (1 = niente).
+    pub fn boost_quiet(&mut self) -> f32 {
+        let peak = self.peak();
+        if peak >= 0.25 || peak < 0.005 {
+            return 1.0;
+        }
+        let gain = (0.7 / peak).min(12.0);
+        for s in &mut self.samples {
+            *s *= gain;
+        }
+        gain
+    }
 }
 
 fn rms(s: &[f32]) -> f32 {
@@ -223,6 +241,30 @@ pub fn read_wav(path: &std::path::Path) -> Result<AudioBuffer> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn boosts_only_quiet_audio() {
+        let mut quiet = AudioBuffer {
+            samples: vec![0.0, 0.05, -0.1, 0.02],
+            sample_rate: 16_000,
+        };
+        let g = quiet.boost_quiet();
+        assert!((g - 7.0).abs() < 1e-4, "{g}");
+        assert!((quiet.peak() - 0.7).abs() < 1e-4);
+
+        let mut loud = AudioBuffer {
+            samples: vec![0.6, -0.4],
+            sample_rate: 16_000,
+        };
+        assert_eq!(loud.boost_quiet(), 1.0);
+        assert_eq!(loud.samples, vec![0.6, -0.4]);
+
+        let mut silence = AudioBuffer {
+            samples: vec![0.001; 10],
+            sample_rate: 16_000,
+        };
+        assert_eq!(silence.boost_quiet(), 1.0);
+    }
 
     #[test]
     fn resample_48k_to_16k_keeps_duration() {

@@ -29,6 +29,24 @@ export interface Settings {
   ui_language: string;
   command_hotkey: string;
   translate_to: string;
+  vocab_dismissed: string[];
+}
+
+export interface Snippet {
+  id: number;
+  trigger: string;
+  text: string;
+}
+
+export interface Stats {
+  dictations: number;
+  words: number;
+  /** Tempo passato a parlare, in ms. */
+  audio_ms: number;
+  /** Parole al giorno, dal più vecchio a oggi. */
+  days: number[];
+  /** [app, parole], le cinque più usate. */
+  apps: [string, number][];
 }
 
 export interface AppMode {
@@ -165,6 +183,20 @@ export const api = {
   deleteMode: (slug: string) => invoke<void>("delete_mode", { slug }),
   resetMode: (slug: string) => invoke<void>("reset_mode", { slug }),
   getVocabulary: () => invoke<string[]>("get_vocabulary"),
+  vocabularySuggestions: () =>
+    invoke<[string, number][]>("vocabulary_suggestions"),
+  dismissSuggestion: (term: string) =>
+    invoke<void>("dismiss_suggestion", { term }),
+  listSnippets: () => invoke<Snippet[]>("list_snippets"),
+  saveSnippet: (trigger: string, text: string) =>
+    invoke<void>("save_snippet", { trigger, text }),
+  deleteSnippet: (id: number) => invoke<void>("delete_snippet", { id }),
+  getStats: (since: number, days: number) =>
+    invoke<Stats>("get_stats", {
+      since,
+      utcOffsetMin: -new Date().getTimezoneOffset(),
+      days,
+    }),
   addTerm: (term: string) => invoke<void>("add_term", { term }),
   removeTerm: (term: string) => invoke<void>("remove_term", { term }),
   getHistory: (filter: HistoryFilter, limit: number, offset: number) =>

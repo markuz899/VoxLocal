@@ -512,6 +512,20 @@ function Detail({
             </Button>
           </>
         )}
+        <Button
+          variant="ghost"
+          onClick={async () => {
+            const term = window.getSelection()?.toString().trim() ?? "";
+            if (!term) {
+              setNotice(t("history.selectFirst"));
+              return;
+            }
+            await api.addTerm(term);
+            setNotice(t("history.addedToVocab", { term }));
+          }}
+        >
+          {t("history.addToVocab")}
+        </Button>
         <span className="flex-1" />
         {confirm ? (
           <>

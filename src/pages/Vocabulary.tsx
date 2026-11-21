@@ -73,6 +73,69 @@ export default function Vocabulary() {
           ))}
         </ul>
       )}
+      <Suggestions onAdded={reload} />
     </>
+  );
+}
+
+/** Nomi e termini ricorrenti nei dettati, da aggiungere con un clic o da ignorare. */
+function Suggestions({ onAdded }: { onAdded: () => void }) {
+  const t = useT();
+  const [items, setItems] = useState<[string, number][]>([]);
+  const reload = () =>
+    api.vocabularySuggestions().then(setItems, () => setItems([]));
+  useEffect(() => {
+    reload();
+  }, []);
+
+  return (
+    <section className="mt-10" aria-labelledby="sugg-h">
+      <h2 id="sugg-h" className="text-[17px] font-semibold">
+        {t("vocab.suggestions")}
+      </h2>
+      <p className="mb-4 max-w-[60ch] text-muted">
+        {t("vocab.suggestionsHint")}
+      </p>
+      {items.length === 0 ? (
+        <p className="text-muted">{t("vocab.noSuggestions")}</p>
+      ) : (
+        <ul className="flex flex-wrap gap-2">
+          {items.map(([term, n]) => (
+            <li
+              key={term}
+              className="flex items-center gap-1 rounded-full border border-dashed border-line py-1 pr-1 pl-1"
+            >
+              <button
+                type="button"
+                aria-label={t("vocab.addSuggestion", { term })}
+                onClick={async () => {
+                  await api.addTerm(term);
+                  reload();
+                  onAdded();
+                }}
+                className="grid h-5 w-5 place-items-center rounded-full text-cobalt hover:bg-cobalt-soft"
+              >
+                +
+              </button>
+              <span>{term}</span>
+              <span className="text-[12px] text-muted">
+                {t("vocab.times", { n })}
+              </span>
+              <button
+                type="button"
+                aria-label={t("vocab.dismiss", { term })}
+                onClick={async () => {
+                  await api.dismissSuggestion(term);
+                  reload();
+                }}
+                className="grid h-5 w-5 place-items-center rounded-full text-muted hover:bg-paper hover:text-ink"
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

@@ -278,6 +278,53 @@ const en = {
   "onb.try.works": "It works. The same happens in any app.",
   "onb.try.atLogin": "Open VoxLocal at login",
   "onb.finish": "Start using VoxLocal",
+  // stats
+  "nav.stats": "Statistics",
+  "stats.title": "Statistics",
+  "stats.description":
+    "What dictation has done for you, measured on your own dictations.",
+  "stats.period": "Period",
+  "stats.week": "Last 7 days",
+  "stats.month": "Last 30 days",
+  "stats.all": "All time",
+  "stats.words": "Words dictated",
+  "stats.saved": "Time saved",
+  "stats.savedHint": "Compared with typing at {wpm} words per minute.",
+  "stats.speed": "Speaking speed",
+  "stats.wpm": "{n} wpm",
+  "stats.faster": "{x}× faster than typing",
+  "stats.dictations": "Dictations",
+  "stats.perDay": "Words per day",
+  "stats.byApp": "Words by app",
+  "stats.empty": "Dictate something and your numbers will appear here.",
+  "stats.dayWords": "{day}: {n} words",
+  "stats.tableDay": "Day",
+  "stats.tableWords": "Words",
+  "stats.hours": "{h} h {m} min",
+  "stats.minutes": "{m} min",
+  // snippets
+  "nav.snippets": "Snippets",
+  "snippets.title": "Snippets",
+  "snippets.description":
+    "Say a short phrase and VoxLocal pastes the saved text instead: your address, a calendar link, a signature. The whole dictation must be the phrase.",
+  "snippets.trigger": "When I say",
+  "snippets.triggerPlaceholder": "my address",
+  "snippets.text": "Paste",
+  "snippets.textPlaceholder": "The text to paste",
+  "snippets.add": "Save snippet",
+  "snippets.empty": "No snippets yet.",
+  "snippets.edit": "Edit",
+  // vocabulary suggestions
+  "vocab.suggestions": "Suggestions",
+  "vocab.suggestionsHint":
+    "Names and terms that come up often in your dictations. Add the ones written right.",
+  "vocab.noSuggestions": "No suggestions for now: they appear as you dictate.",
+  "vocab.addSuggestion": "Add {term}",
+  "vocab.dismiss": "Ignore {term}",
+  "vocab.times": "{n}×",
+  "history.addToVocab": "Add the selection to the vocabulary",
+  "history.addedToVocab": "“{term}” added to the vocabulary.",
+  "history.selectFirst": "Select a word in the text first.",
 };
 
 type Key = keyof typeof en;
@@ -552,6 +599,50 @@ const it: Record<Key, string> = {
   "onb.try.works": "Funziona. Lo stesso succede in qualsiasi app.",
   "onb.try.atLogin": "Apri VoxLocal all'accesso",
   "onb.finish": "Inizia a usare VoxLocal",
+  "nav.stats": "Statistiche",
+  "stats.title": "Statistiche",
+  "stats.description":
+    "Cosa ha fatto la dettatura per te, misurato sui tuoi dettati.",
+  "stats.period": "Periodo",
+  "stats.week": "Ultimi 7 giorni",
+  "stats.month": "Ultimi 30 giorni",
+  "stats.all": "Da sempre",
+  "stats.words": "Parole dettate",
+  "stats.saved": "Tempo risparmiato",
+  "stats.savedHint": "Rispetto a scrivere a {wpm} parole al minuto.",
+  "stats.speed": "Velocità parlando",
+  "stats.wpm": "{n} parole/min",
+  "stats.faster": "{x} volte più veloce che scrivere",
+  "stats.dictations": "Dettati",
+  "stats.perDay": "Parole al giorno",
+  "stats.byApp": "Parole per app",
+  "stats.empty": "Detta qualcosa e qui compariranno i tuoi numeri.",
+  "stats.dayWords": "{day}: {n} parole",
+  "stats.tableDay": "Giorno",
+  "stats.tableWords": "Parole",
+  "stats.hours": "{h} h {m} min",
+  "stats.minutes": "{m} min",
+  "nav.snippets": "Snippet",
+  "snippets.title": "Snippet",
+  "snippets.description":
+    "Dici una frase breve e VoxLocal incolla al suo posto il testo salvato: il tuo indirizzo, un link al calendario, una firma. Tutto il dettato deve essere la frase.",
+  "snippets.trigger": "Quando dico",
+  "snippets.triggerPlaceholder": "il mio indirizzo",
+  "snippets.text": "Incolla",
+  "snippets.textPlaceholder": "Il testo da incollare",
+  "snippets.add": "Salva lo snippet",
+  "snippets.empty": "Ancora nessuno snippet.",
+  "snippets.edit": "Modifica",
+  "vocab.suggestions": "Suggerimenti",
+  "vocab.suggestionsHint":
+    "Nomi e termini che tornano spesso nei tuoi dettati. Aggiungi quelli scritti giusti.",
+  "vocab.noSuggestions": "Per ora nessun suggerimento: compaiono mentre detti.",
+  "vocab.addSuggestion": "Aggiungi {term}",
+  "vocab.dismiss": "Ignora {term}",
+  "vocab.times": "{n}×",
+  "history.addToVocab": "Aggiungi la selezione al vocabolario",
+  "history.addedToVocab": "“{term}” aggiunto al vocabolario.",
+  "history.selectFirst": "Seleziona prima una parola nel testo.",
 };
 
 export type Lang = "en" | "it";
@@ -755,6 +846,26 @@ export const FAQ: Record<
         "Every dictation with the app it went to, what you said and what was written, the mode and the timings. You can search it, filter it, delete one dictation or clear everything. It stays on this computer.",
       ],
       [
+        "What are snippets?",
+        "Short phrases that paste saved text. Say “my address” and VoxLocal pastes your full address instead of the words. You create them in Snippets.",
+      ],
+      [
+        "Can I correct myself while speaking?",
+        "Yes. Say “at 3, no, at 4” and the Clean mode writes “at 4”. Say “new line”, “new paragraph” or “bullet point” and the text is formatted instead of written out.",
+      ],
+      [
+        "Does it work if I speak quietly?",
+        "Yes. VoxLocal raises quiet or whispered speech before transcribing it, so you can dictate in an open-plan office.",
+      ],
+      [
+        "How does the vocabulary learn?",
+        "Vocabulary suggests names and terms that come up often in your dictations; add them with one click. In History you can also select a word and add it.",
+      ],
+      [
+        "How much time am I saving?",
+        "Statistics shows the words you dictated, your speaking speed and the time saved compared with typing, measured on your own dictations.",
+      ],
+      [
         "What if the LLM does not answer?",
         "VoxLocal pastes the transcription anyway after 15 seconds and tells you. A dictation is never lost: it is always in the history.",
       ],
@@ -807,6 +918,26 @@ export const FAQ: Record<
       [
         "Cosa conserva la cronologia?",
         "Ogni dettato con l'app in cui è finito, quello che hai detto e quello che è stato scritto, la modalità e i tempi. Puoi cercare, filtrare, eliminare un dettato o svuotare tutto. Resta su questo computer.",
+      ],
+      [
+        "Cosa sono gli snippet?",
+        "Frasi brevi che incollano un testo salvato. Dici “il mio indirizzo” e VoxLocal incolla l'indirizzo completo al posto delle parole. Si creano in Snippet.",
+      ],
+      [
+        "Posso correggermi mentre parlo?",
+        "Sì. Dici “alle 3, anzi alle 4” e la modalità Pulito scrive “alle 4”. Dici “a capo”, “nuovo paragrafo” o “punto elenco” e il testo viene formattato invece di essere scritto.",
+      ],
+      [
+        "Funziona se parlo sottovoce?",
+        "Sì. VoxLocal amplifica la voce bassa o sussurrata prima di trascriverla, così puoi dettare anche in un open space.",
+      ],
+      [
+        "Come impara il vocabolario?",
+        "Il Vocabolario ti suggerisce nomi e termini che tornano spesso nei dettati; li aggiungi con un clic. Dalla Cronologia puoi anche selezionare una parola e aggiungerla.",
+      ],
+      [
+        "Quanto tempo sto risparmiando?",
+        "Le Statistiche mostrano le parole dettate, la velocità con cui parli e il tempo risparmiato rispetto a scrivere, misurati sui tuoi dettati.",
       ],
       [
         "E se l'LLM non risponde?",

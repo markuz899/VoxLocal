@@ -347,6 +347,27 @@ const en = {
   "files.summarize": "Summarize",
   "files.summarizing": "Summarizing…",
   "files.summary": "Summary",
+  // meetings
+  "nav.meetings": "Meeting notes",
+  "meetings.title": "Meeting notes",
+  "meetings.description":
+    "Record a call in Zoom, Meet or Teams: your microphone and the other people are recorded as two tracks and transcribed on this computer, then summarized with decisions and next steps.",
+  "meetings.how":
+    "Start before the call. With headphones the two voices stay apart; with speakers VoxLocal removes the echo.",
+  "meetings.start": "Start meeting notes",
+  "meetings.stop": "Stop and transcribe",
+  "meetings.recording": "Recording the meeting",
+  "meetings.micOnly": "Only your microphone is being recorded: {why}",
+  "meetings.permission":
+    "To record the other people too, VoxLocal needs Screen Recording permission (only the audio is used).",
+  "meetings.grant": "Grant permission",
+  "meetings.empty": "No meetings yet.",
+  "meetings.transcribing": "Transcribing… {pct}%",
+  "meetings.failed": "Transcription failed",
+  "meetings.name": "Meeting name",
+  "meetings.resummarize": "Summarize again",
+  "meetings.deleteConfirm": "Delete meeting and audio",
+
   // backup
   "backup.title": "Backup",
   "backup.label": "Settings file",
@@ -696,6 +717,26 @@ const it: Record<Key, string> = {
   "files.summarize": "Riassumi",
   "files.summarizing": "Riassumo…",
   "files.summary": "Riassunto",
+  "nav.meetings": "Note riunioni",
+  "meetings.title": "Note riunioni",
+  "meetings.description":
+    "Registra una chiamata in Zoom, Meet o Teams: il tuo microfono e gli altri finiscono in due tracce trascritte su questo computer, poi riassunte con decisioni e cose da fare.",
+  "meetings.how":
+    "Avvia prima della chiamata. Con le cuffie le due voci restano separate; con le casse VoxLocal toglie l'eco.",
+  "meetings.start": "Avvia le note della riunione",
+  "meetings.stop": "Ferma e trascrivi",
+  "meetings.recording": "Sto registrando la riunione",
+  "meetings.micOnly": "Registro solo il tuo microfono: {why}",
+  "meetings.permission":
+    "Per registrare anche gli altri, VoxLocal ha bisogno del permesso Registrazione schermo (usa solo l'audio).",
+  "meetings.grant": "Concedi il permesso",
+  "meetings.empty": "Ancora nessuna riunione.",
+  "meetings.transcribing": "Trascrivo… {pct}%",
+  "meetings.failed": "Trascrizione non riuscita",
+  "meetings.name": "Nome della riunione",
+  "meetings.resummarize": "Riassumi di nuovo",
+  "meetings.deleteConfirm": "Elimina riunione e audio",
+
   "backup.title": "Backup",
   "backup.label": "File delle impostazioni",
   "backup.hint":
@@ -945,6 +986,10 @@ export const FAQ: Record<
         "In General → Backup, export a file with your vocabulary, snippets, modes and app rules, and import it on the other computer. API keys are never exported.",
       ],
       [
+        "How do meeting notes work?",
+        "Start them before a call: your microphone and the audio of the call are recorded as two tracks, transcribed on this computer with “Me” and “Others”, and summarized with decisions and next steps. On Mac it needs Screen Recording permission, used for the audio only.",
+      ],
+      [
         "What if the LLM does not answer?",
         "VoxLocal pastes the transcription anyway after 15 seconds and tells you. A dictation is never lost: it is always in the history.",
       ],
@@ -1025,6 +1070,10 @@ export const FAQ: Record<
       [
         "Come porto le impostazioni su un altro computer?",
         "In Generale → Backup esporti un file con vocabolario, snippet, modalità e regole per app, e lo importi sull'altro computer. Le chiavi API non vengono mai esportate.",
+      ],
+      [
+        "Come funzionano le note riunioni?",
+        "Le avvii prima di una chiamata: il tuo microfono e l'audio della chiamata vengono registrati in due tracce, trascritti su questo computer con “Io” e “Altri” e riassunti con decisioni e cose da fare. Su Mac serve il permesso Registrazione schermo, usato solo per l'audio.",
       ],
       [
         "E se l'LLM non risponde?",

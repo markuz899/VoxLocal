@@ -189,6 +189,25 @@ fn menu(app: &AppHandle, pipeline: &Pipeline) -> tauri::Result<Menu<Wry>> {
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(
                 app,
+                "meeting",
+                if pipeline.meeting_recording() {
+                    tr(
+                        &s.ui_language,
+                        "Stop meeting notes",
+                        "Ferma le note della riunione",
+                    )
+                } else {
+                    tr(
+                        &s.ui_language,
+                        "Start meeting notes",
+                        "Avvia le note della riunione",
+                    )
+                },
+                true,
+                None::<&str>,
+            )?,
+            &MenuItem::with_id(
+                app,
                 "repaste",
                 tr(
                     &s.ui_language,
@@ -259,6 +278,23 @@ fn on_menu(app: &AppHandle, id: &str) {
         "quit" => return app.exit(0),
         "open" => return crate::open_main(app, None),
         "history" => return crate::open_main(app, Some("history")),
+        "meeting" => {
+            let p = pipeline.clone();
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let res = if p.meeting_recording() {
+                    p.meeting_stop().await.map(|_| ())
+                } else {
+                    p.meeting_start().map(|_| ())
+                };
+                if let Err(e) = res {
+                    p.notify(&format!("{e:#}"));
+                } else if !p.meeting_recording() {
+                    crate::open_main(&app, Some("meetings"));
+                }
+            });
+            return;
+        }
         "check-update" | "update" => {
             let app = app.clone();
             let lang = pipeline.settings().ui_language;

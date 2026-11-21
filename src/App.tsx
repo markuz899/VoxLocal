@@ -18,6 +18,7 @@ import Faq from "./pages/Faq";
 import Stats from "./pages/Stats";
 import Snippets from "./pages/Snippets";
 import Files from "./pages/Files";
+import Meetings from "./pages/Meetings";
 import { translate, useT } from "./i18n";
 
 interface SettingsCtx {
@@ -41,6 +42,7 @@ const SECTIONS = [
   { id: "providers", label: "nav.providers", page: Providers },
   { id: "vocabulary", label: "nav.vocabulary", page: Vocabulary },
   { id: "snippets", label: "nav.snippets", page: Snippets },
+  { id: "meetings", label: "nav.meetings", page: Meetings },
   { id: "files", label: "nav.files", page: Files },
   { id: "history", label: "nav.history", page: History },
   { id: "stats", label: "nav.stats", page: Stats },

@@ -73,6 +73,19 @@ CREATE TABLE snippets (
   created_at INTEGER NOT NULL
 );
 "#,
+    r#"
+CREATE TABLE meetings (
+  id INTEGER PRIMARY KEY,
+  started_at INTEGER NOT NULL,
+  duration_ms INTEGER NOT NULL,
+  title TEXT NOT NULL DEFAULT '',
+  dir TEXT NOT NULL,
+  status TEXT NOT NULL,
+  error TEXT,
+  lines TEXT NOT NULL DEFAULT '[]',
+  summary TEXT
+);
+"#,
 ];
 
 /// Regole comuni a tutte le modalità: il dettato è dato, non istruzioni (prompt injection).
@@ -191,6 +204,20 @@ pub struct BundleMode {
     pub system_prompt: String,
     pub user_template: String,
     pub temperature: f64,
+}
+
+/// Una riunione registrata. `lines` è il JSON delle righe (meeting::Line), `status` recording | transcribing | done | error.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Meeting {
+    pub id: i64,
+    pub started_at: i64,
+    pub duration_ms: i64,
+    pub title: String,
+    pub dir: String,
+    pub status: String,
+    pub error: Option<String>,
+    pub lines: serde_json::Value,
+    pub summary: Option<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -554,6 +581,109 @@ impl Storage {
             ],
         )?;
         Ok(slug)
+    }
+
+    pub fn insert_meeting(&self, started_at: i64, duration_ms: i64, dir: &str) -> Result<i64> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute(
+            "INSERT INTO meetings (started_at, duration_ms, dir, status) VALUES (?1, ?2, ?3, 'transcribing')",
+            params![started_at, duration_ms, dir],
+        )?;
+        Ok(conn.last_insert_rowid())
+    }
+
+    pub fn finish_meeting(&self, id: i64, lines: &str, error: Option<&str>) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "UPDATE meetings SET lines = ?2, status = ?3, error = ?4 WHERE id = ?1",
+            params![
+                id,
+                lines,
+                if error.is_some() { "error" } else { "done" },
+                error
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub fn set_meeting_summary(&self, id: i64, summary: &str) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "UPDATE meetings SET summary = ?2 WHERE id = ?1",
+            params![id, summary],
+        )?;
+        Ok(())
+    }
+
+    pub fn rename_meeting(&self, id: i64, title: &str) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "UPDATE meetings SET title = ?2 WHERE id = ?1",
+            params![id, title.trim()],
+        )?;
+        Ok(())
+    }
+
+    /// Le riunioni, dalla più recente; senza righe (`lines` vuoto) per tenere leggero l'elenco.
+    pub fn meetings(&self) -> Result<Vec<Meeting>> {
+        let conn = self.conn.lock().unwrap();
+        let mut st = conn.prepare(
+            "SELECT id, started_at, duration_ms, title, dir, status, error, summary FROM meetings ORDER BY started_at DESC",
+        )?;
+        let rows = st.query_map([], |r| {
+            Ok(Meeting {
+                id: r.get(0)?,
+                started_at: r.get(1)?,
+                duration_ms: r.get(2)?,
+                title: r.get(3)?,
+                dir: r.get(4)?,
+                status: r.get(5)?,
+                error: r.get(6)?,
+                lines: serde_json::Value::Array(vec![]),
+                summary: r.get(7)?,
+            })
+        })?;
+        Ok(rows.collect::<rusqlite::Result<_>>()?)
+    }
+
+    pub fn meeting(&self, id: i64) -> Result<Option<Meeting>> {
+        let conn = self.conn.lock().unwrap();
+        let mut st = conn.prepare(
+            "SELECT id, started_at, duration_ms, title, dir, status, error, lines, summary FROM meetings WHERE id = ?1",
+        )?;
+        let mut rows = st.query_map(params![id], |r| {
+            let lines: String = r.get(7)?;
+            Ok(Meeting {
+                id: r.get(0)?,
+                started_at: r.get(1)?,
+                duration_ms: r.get(2)?,
+                title: r.get(3)?,
+                dir: r.get(4)?,
+                status: r.get(5)?,
+                error: r.get(6)?,
+                lines: serde_json::from_str(&lines).unwrap_or(serde_json::Value::Array(vec![])),
+                summary: r.get(8)?,
+            })
+        })?;
+        Ok(rows.next().transpose()?)
+    }
+
+    /// Cancella la riunione e restituisce la sua cartella, che chi chiama elimina dal disco.
+    pub fn delete_meeting(&self, id: i64) -> Result<Option<String>> {
+        let conn = self.conn.lock().unwrap();
+        let dir: Option<String> = conn
+            .query_row("SELECT dir FROM meetings WHERE id = ?1", params![id], |r| {
+                r.get(0)
+            })
+            .ok();
+        conn.execute("DELETE FROM meetings WHERE id = ?1", params![id])?;
+        Ok(dir)
+    }
+
+    /// Una trascrizione interrotta (l'app chiusa a metà) resta in errore invece che "in corso" per sempre.
+    pub fn fail_unfinished_meetings(&self) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "UPDATE meetings SET status = 'error', error = 'trascrizione interrotta' WHERE status = 'transcribing'",
+            [],
+        )?;
+        Ok(())
     }
 
     /// Vocabolario, snippet e modalità create dall'utente, da salvare in un file.
@@ -1139,6 +1269,33 @@ mod tests {
             .unwrap(); // aggiorna, non duplica
         assert_eq!(s.snippets().unwrap().len(), 1);
         assert!(s.save_snippet(" . ", "x").is_err());
+    }
+
+    #[test]
+    fn meetings_are_stored_and_finished() {
+        let s = Storage::in_memory().unwrap();
+        let id = s.insert_meeting(1_000, 60_000, "/tmp/m1").unwrap();
+        assert_eq!(s.meeting(id).unwrap().unwrap().status, "transcribing");
+        s.finish_meeting(
+            id,
+            r#"[{"speaker":"me","start_ms":0,"end_ms":900,"text":"Ciao"}]"#,
+            None,
+        )
+        .unwrap();
+        s.set_meeting_summary(id, "Riassunto").unwrap();
+        s.rename_meeting(id, " Punto rilascio ").unwrap();
+        let m = s.meeting(id).unwrap().unwrap();
+        assert_eq!(
+            (m.status.as_str(), m.title.as_str(), m.summary.as_deref()),
+            ("done", "Punto rilascio", Some("Riassunto"))
+        );
+        assert_eq!(m.lines[0]["text"], "Ciao");
+        let other = s.insert_meeting(2_000, 1_000, "/tmp/m2").unwrap();
+        s.fail_unfinished_meetings().unwrap();
+        assert_eq!(s.meeting(other).unwrap().unwrap().status, "error");
+        assert_eq!(s.meetings().unwrap().first().unwrap().id, other);
+        assert_eq!(s.delete_meeting(id).unwrap().as_deref(), Some("/tmp/m1"));
+        assert!(s.meeting(id).unwrap().is_none());
     }
 
     #[test]

@@ -517,3 +517,49 @@ pub async fn import_settings(app: AppHandle, p: P<'_>) -> R<Option<ImportResult>
         app_rules: bundle.app_modes.len(),
     }))
 }
+
+#[tauri::command]
+pub fn meeting_start(p: P) -> R<crate::pipeline::MeetingState> {
+    p.meeting_start().map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub async fn meeting_stop(p: P<'_>) -> R<i64> {
+    p.meeting_stop().await.map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn meeting_state(p: P) -> crate::pipeline::MeetingState {
+    p.meeting_state()
+}
+
+#[tauri::command]
+pub fn list_meetings(p: P) -> R<Vec<crate::storage::Meeting>> {
+    p.storage.meetings().map_err(err)
+}
+
+#[tauri::command]
+pub fn get_meeting(p: P, id: i64) -> R<Option<crate::storage::Meeting>> {
+    p.storage.meeting(id).map_err(err)
+}
+
+#[tauri::command]
+pub async fn summarize_meeting(p: P<'_>, id: i64) -> R<String> {
+    p.summarize_meeting(id).await.map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn rename_meeting(p: P, id: i64, title: String) -> R<()> {
+    p.storage.rename_meeting(id, &title).map_err(err)
+}
+
+#[tauri::command]
+pub fn delete_meeting(p: P, id: i64) -> R<()> {
+    p.delete_meeting(id).map_err(|e| format!("{e:#}"))
+}
+
+/// Il permesso "Registrazione schermo" (audio delle app su macOS); `request` apre la richiesta di sistema.
+#[tauri::command]
+pub fn screen_permission(request: bool) -> bool {
+    crate::meeting::screen_permission(request)
+}

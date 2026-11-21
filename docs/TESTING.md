@@ -181,6 +181,15 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] **Avviso privacy:** con un provider cloud compare l'avviso arancione; con Ollama "restano su questo computer".
 - [ ] **Riunione eliminata:** non compare più tra le fonti.
 
+## Comando scritto nella barra
+
+- [ ] **Tocco:** seleziona un testo in Note, tocca ⌥⇧ Spazio senza parlare: si apre la barra con il numero di parole.
+- [ ] **Scritto:** scrivi "traduci in inglese" e premi Invio: la selezione in Note viene sostituita.
+- [ ] **Recente:** riapri la barra: il comando appena usato è in cima; frecce più Invio lo applicano.
+- [ ] **Esc e clic fuori:** la barra si chiude, la selezione resta, gli appunti tornano quelli di prima.
+- [ ] **Voce:** tenendo premuto e parlando il comando funziona come prima, senza barra.
+- [ ] **Senza selezione:** un tocco senza testo selezionato mostra l'avviso, nessuna barra.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

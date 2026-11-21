@@ -409,7 +409,11 @@ function Detail({
     [
       t("meta.transcription"),
       [
-        item.stt_provider === "local" ? t("meta.local") : item.stt_provider,
+        item.stt_provider === "local"
+          ? t("meta.local")
+          : item.stt_provider === "typed"
+            ? t("meta.typed")
+            : item.stt_provider,
         item.stt_model,
       ]
         .filter(Boolean)

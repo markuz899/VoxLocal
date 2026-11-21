@@ -1345,6 +1345,21 @@ impl Storage {
         Ok(out)
     }
 
+    /// I comandi sulla selezione usati di recente, dal più recente, senza doppioni.
+    pub fn recent_commands(&self, limit: usize) -> Result<Vec<String>> {
+        let conn = self.conn.lock().unwrap();
+        let mut st = conn.prepare(
+            "SELECT command FROM dictations WHERE command IS NOT NULL AND trim(command) != '' \
+             GROUP BY lower(trim(command)) ORDER BY max(id) DESC LIMIT ?1",
+        )?;
+        let rows = st.query_map([limit as i64], |r| r.get::<_, String>(0))?;
+        Ok(rows
+            .collect::<rusqlite::Result<Vec<_>>>()?
+            .into_iter()
+            .map(|c| c.trim().to_string())
+            .collect())
+    }
+
     pub fn vocabulary(&self) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
         let mut st = conn.prepare("SELECT term FROM vocabulary ORDER BY term")?;
@@ -1574,6 +1589,32 @@ mod tests {
             .unwrap(); // aggiorna, non duplica
         assert_eq!(s.snippets().unwrap().len(), 1);
         assert!(s.save_snippet(" . ", "x").is_err());
+    }
+
+    #[test]
+    fn recent_commands_are_unique_and_newest_first() {
+        let s = Storage::in_memory().unwrap();
+        for c in [
+            "Traduci in inglese",
+            "rendilo formale",
+            " traduci in inglese ",
+        ] {
+            s.insert_dictation(&Dictation {
+                command: Some(c.into()),
+                status: "ok",
+                ..Default::default()
+            })
+            .unwrap();
+        }
+        s.insert_dictation(&Dictation {
+            status: "ok",
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            s.recent_commands(5).unwrap(),
+            vec!["traduci in inglese", "rendilo formale"]
+        );
     }
 
     #[test]

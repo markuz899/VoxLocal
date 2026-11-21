@@ -268,6 +268,13 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Privacy:** la pagina dice se il provider è locale (OpenAI-compatibile su localhost: Ollama, LM Studio) o se le frasi trovate escono verso il provider.
 - **Rimandato:** la ricerca per significato (embedding: un modello locale in più, circa 100 MB, e un indice). Si aggiunge se le domande reali perdono brani ovvi.
 
+## D52 — Comando sulla selezione scritto: un tocco apre la barra
+
+- **Gesto:** la stessa scorciatoia del comando. Tenuta premuta e parlando, funziona come prima. Toccata senza parlare (audio scartato o trascrizione vuota), la selezione già copiata resta in attesa e si apre la barra (`palette.rs`, `palette.html`). Niente seconda scorciatoia da imparare.
+- **Barra:** campo di testo, comandi recenti presi dalla cronologia (`recent_commands`, senza doppioni) e alcuni suggeriti, il numero di parole selezionate. Invio applica, Esc o un clic fuori chiude e rimette gli appunti di prima.
+- **Focus:** la barra prende il focus; prima di incollare VoxLocal riattiva l'app di prima per pid (`NSRunningApplication`), la cui selezione è rimasta attiva, e poi ⌘V. Su Windows chiudere la barra ridà il focus alla finestra precedente.
+- **Cronologia:** il comando scritto si salva come quello detto, con `stt_provider = "typed"`.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

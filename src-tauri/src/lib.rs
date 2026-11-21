@@ -5,6 +5,7 @@ mod context;
 mod i18n;
 pub mod llm;
 pub mod meeting;
+mod meeting_watch;
 pub mod models;
 mod overlay;
 pub mod paste;
@@ -113,6 +114,9 @@ pub fn run() {
         .manage(updater::Pending::default())
         .invoke_handler(tauri::generate_handler![
             commands::meeting_start,
+            commands::prompt_close,
+            commands::calendar_access,
+            commands::open_section,
             commands::meeting_stop,
             commands::meeting_state,
             commands::list_meetings,
@@ -189,6 +193,7 @@ pub fn run() {
             let pipeline = Pipeline::new(handle.clone(), settings.clone(), storage);
             app.manage(pipeline.clone());
             tray::build(&handle, &pipeline)?;
+            meeting_watch::spawn(pipeline.clone());
 
             for hk in [&settings.hotkey, &settings.command_hotkey] {
                 if hk.is_empty() {

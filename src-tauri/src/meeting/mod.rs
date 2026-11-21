@@ -1,13 +1,15 @@
 //! Note delle riunioni: due tracce registrate insieme (il microfono = "io", l'audio delle app = "gli altri"),
 //! scritte su disco a 16 kHz mentre arrivano, poi trascritte e unite in ordine di tempo.
 
+pub mod calendar;
+pub mod detect;
 #[cfg(target_os = "macos")]
 mod system_audio;
 
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -113,9 +115,14 @@ pub struct Recording {
     /// Almeno un campione diverso da zero dal microfono. Uno zero perfetto per secondi è macOS che
     /// non concede il microfono (un microfono vero ha sempre un po' di rumore).
     mic_heard: Arc<AtomicBool>,
+    /// Quando (ms dall'avvio) l'audio delle app ha avuto suono l'ultima volta.
+    apps_heard_ms: Arc<AtomicU64>,
     #[cfg(target_os = "macos")]
     system: Option<(system_audio::SystemAudio, Arc<Mutex<TrackWriter>>)>,
     pub system_error: Option<String>,
+    /// Dall'evento del calendario in corso, se l'opzione è attiva.
+    pub title: String,
+    pub attendees: Vec<String>,
 }
 
 /// Le tracce scritte su disco a fine registrazione.
@@ -125,6 +132,8 @@ pub struct Tracks {
     pub others: Option<PathBuf>,
     pub duration_ms: u64,
     pub started_at: i64,
+    pub title: String,
+    pub attendees: Vec<String>,
 }
 
 impl Recording {
@@ -136,6 +145,7 @@ impl Recording {
         std::fs::create_dir_all(&dir)?;
 
         let mic_heard = Arc::new(AtomicBool::new(false));
+        let apps_heard_ms = Arc::new(AtomicU64::new(0));
         // la frequenza del microfono si conosce solo dopo l'apertura: lo scrittore nasce al primo blocco
         // (i campioni dei primi ~100 ms, prima che la frequenza sia nota, si perdono)
         let mic = {
@@ -172,8 +182,13 @@ impl Recording {
         let (system, system_error) = {
             let path = dir.join("others.wav");
             let writer = Arc::new(Mutex::new(TrackWriter::create(&path, system_audio::RATE)?));
-            let w = writer.clone();
-            match system_audio::SystemAudio::start(move |chunk| w.lock().unwrap().push(chunk)) {
+            let (w, heard, t0) = (writer.clone(), apps_heard_ms.clone(), Instant::now());
+            match system_audio::SystemAudio::start(move |chunk| {
+                if chunk.iter().any(|v| v.abs() > APPS_SOUND) {
+                    heard.store(t0.elapsed().as_millis() as u64, Ordering::Relaxed);
+                }
+                w.lock().unwrap().push(chunk)
+            }) {
                 Ok(s) => (Some((s, writer)), None),
                 Err(e) => {
                     let _ = std::fs::remove_file(&path);
@@ -190,9 +205,12 @@ impl Recording {
             started_at,
             mic,
             mic_heard,
+            apps_heard_ms,
             #[cfg(target_os = "macos")]
             system,
             system_error,
+            title: String::new(),
+            attendees: vec![],
         })
     }
 
@@ -201,6 +219,16 @@ impl Recording {
         self.mic.is_some()
             && self.started.elapsed().as_secs() >= 3
             && !self.mic_heard.load(Ordering::Relaxed)
+    }
+
+    /// Da quanto tempo l'audio delle app tace (la chiamata è forse finita). `None` senza audio delle app.
+    pub fn apps_quiet_for(&self) -> Option<std::time::Duration> {
+        #[cfg(target_os = "macos")]
+        if self.system.is_some() {
+            let last = std::time::Duration::from_millis(self.apps_heard_ms.load(Ordering::Relaxed));
+            return Some(self.started.elapsed().saturating_sub(last));
+        }
+        None
     }
 
     pub fn stop(self) -> Result<Tracks> {
@@ -230,6 +258,8 @@ impl Recording {
             others,
             duration_ms: duration_ms.max(self.started.elapsed().as_millis() as u64),
             started_at: self.started_at,
+            title: self.title,
+            attendees: self.attendees,
         })
     }
 }
@@ -264,6 +294,9 @@ pub fn keep_spoken(segments: Vec<Segment>, audio: &AudioBuffer) -> Vec<Segment> 
         .filter(|s| window_rms(audio, s.start_ms, s.end_ms.max(s.start_ms + 200)) >= SILENCE_RMS)
         .collect()
 }
+
+/// Un picco sopra questo valore nell'audio delle app conta come suono (la chiamata è viva).
+const APPS_SOUND: f32 = 0.01;
 
 /// Sotto questa energia il tratto è silenzio (o rumore di fondo del microfono).
 // ponytail: soglia fissa; se ci sono microfoni molto rumorosi, renderla relativa al rumore misurato.

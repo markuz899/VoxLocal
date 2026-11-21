@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>VoxLocal legge l'evento in corso per dare il nome e i partecipanti alle note della riunione. Non modifica il calendario.</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>VoxLocal legge l'evento in corso per dare il nome e i partecipanti alle note della riunione. Non modifica il calendario.</string>
   <key>NSMicrophoneUsageDescription</key>
   <string>VoxLocal usa il microfono per trascrivere ciò che detti. L'audio resta sul tuo computer.</string>
 </dict>

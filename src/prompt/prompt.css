@@ -1,0 +1,97 @@
+/* Proposta riunione: niente React né Tailwind, come l'overlay. */
+:root {
+  --bg: rgba(255, 255, 255, 0.96);
+  --ink: #18202b;
+  --muted: #667085;
+  --line: rgba(24, 32, 43, 0.12);
+  --action: #18202b;
+  --action-ink: #fff;
+  --rec: #e5484d;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: rgba(34, 38, 46, 0.96);
+    --ink: #e6e9ef;
+    --muted: #9aa3b2;
+    --line: rgba(255, 255, 255, 0.12);
+    --action: #e6e9ef;
+    --action-ink: #18202b;
+  }
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+  font:
+    13px/1.4 -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    system-ui,
+    sans-serif;
+  color: var(--ink);
+  -webkit-user-select: none;
+  user-select: none;
+}
+.card {
+  box-sizing: border-box;
+  height: 100%;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--rec);
+  box-shadow: 0 0 0 3px rgba(229, 72, 77, 0.2);
+}
+body[data-kind="end"] .dot {
+  background: var(--muted);
+  box-shadow: none;
+}
+p {
+  margin: 0;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+button {
+  font: inherit;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+}
+button.primary {
+  background: var(--action);
+  color: var(--action-ink);
+  border-color: var(--action);
+}
+button:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}

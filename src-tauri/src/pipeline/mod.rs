@@ -856,10 +856,21 @@ impl Pipeline {
                 "Stai già registrando una riunione."
             )
         );
-        let rec = crate::meeting::Recording::start(
+        let mut rec = crate::meeting::Recording::start(
             &crate::meeting::root_dir(),
             self.settings().audio_device.clone(),
         )?;
+        if self.settings().meeting_calendar {
+            if let Some(ev) = crate::meeting::calendar::current_event() {
+                log::info!(
+                    "riunione: evento \"{}\", {} partecipanti",
+                    ev.title,
+                    ev.attendees.len()
+                );
+                rec.title = ev.title;
+                rec.attendees = ev.attendees;
+            }
+        }
         if let Some(e) = &rec.system_error {
             log::warn!("riunione senza audio delle app: {e}");
         }
@@ -884,6 +895,33 @@ impl Pipeline {
         }
     }
 
+    pub fn app_handle(&self) -> AppHandle {
+        self.app.clone()
+    }
+
+    /// Nessun dettato in corso: il microfono acceso, se c'è, è di un'altra app.
+    pub fn dictation_idle(&self) -> bool {
+        self.inner.lock().unwrap().state == State::Idle
+    }
+
+    pub fn meeting_apps_quiet_for(&self) -> Option<Duration> {
+        self.meeting
+            .lock()
+            .unwrap()
+            .as_ref()
+            .and_then(|r| r.apps_quiet_for())
+    }
+
+    /// Il titolo che la riunione avrà (l'evento del calendario in corso), se si conosce.
+    pub fn meeting_title_hint(&self) -> String {
+        if !self.settings().meeting_calendar {
+            return String::new();
+        }
+        crate::meeting::calendar::current_event()
+            .map(|e| e.title)
+            .unwrap_or_default()
+    }
+
     pub fn meeting_recording(&self) -> bool {
         self.meeting.lock().unwrap().is_some()
     }
@@ -905,6 +943,8 @@ impl Pipeline {
             tracks.started_at,
             tracks.duration_ms as i64,
             &tracks.dir.to_string_lossy(),
+            &tracks.title,
+            &tracks.attendees,
         )?;
         let _ = self.app.emit("meeting://state", &MeetingState::default());
         let _ = self.app.emit("history://changed", 0);

@@ -4,7 +4,8 @@
   "description": "Finestre dell'app: comandi VoxLocal, eventi e API core. Nessuna rete n\u00e9 segreti nel webview.",
   "windows": [
     "main",
-    "overlay"
+    "overlay",
+    "prompt"
   ],
   "permissions": [
     "core:default"

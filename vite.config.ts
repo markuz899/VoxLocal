@@ -9,7 +9,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       // Due pagine: impostazioni (React) e overlay (TS puro, sempre in memoria).
-      input: { main: "index.html", overlay: "overlay.html" },
+      input: { main: "index.html", overlay: "overlay.html", prompt: "prompt.html" },
     },
   },
 });

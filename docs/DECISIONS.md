@@ -243,6 +243,20 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Windows e Linux:** per ora solo il microfono, e la UI lo dice. Il loopback WASAPI è il prossimo passo.
 - **Prova reale:** frase riprodotta da `afplay`, catturata, trascritta come "Altri" (test `meeting_end_to_end`, ignorato).
 
+## D50 — Avvio automatico delle note e nome dal calendario
+- **Rilevazione senza permessi:**
+  - CoreAudio (`kAudioDevicePropertyDeviceIsRunningSomewhere` sul microfono predefinito) dice se un'altra app sta usando il microfono;
+  - NSWorkspace dice se è aperta un'app da chiamata (Zoom, Teams, Webex, FaceTime, Slack, Discord, Skype, WhatsApp) o se c'è un browser in primo piano (Meet).
+- **Quando propone:** il microfono deve restare acceso 5 s e VoxLocal non deve star dettando. Una sola proposta per accensione del microfono.
+- **Fine chiamata:** durante la registrazione, dopo 2 minuti senza suono dalle app propone "Ferma e trascrivi".
+- **La proposta:** una finestrella (`prompt.html`, TS puro come l'overlay) in alto a destra, sempre in primo piano, che sparisce da sola dopo 25 s. Le notifiche di sistema su desktop non hanno pulsanti affidabili.
+- **Limite noto:** la "chiamata" è un'inferenza. Un memo vocale con il browser in primo piano propone una registrazione. Con macOS 14.2+ si potrà chiedere quale processo usa il microfono (oggetti processo di CoreAudio).
+- **Calendario (EventKit):**
+  - si chiede il permesso Calendari solo quando l'utente attiva l'opzione;
+  - si sceglie l'evento in corso o che inizia entro 10 minuti, esclusi quelli di tutto il giorno; tra quelli sovrapposti, il più recente;
+  - titolo e partecipanti vanno nella riunione (migrazione 6, colonna `attendees`) e la proposta mostra già il titolo.
+- **Windows e Linux:** nessuna rilevazione per ora; si avvia a mano.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

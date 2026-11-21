@@ -162,6 +162,17 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] **Elimina:** toglie la riunione e la sua cartella audio in `meetings/`.
 - [ ] **Test automatico:** `VOXLOCAL_MODEL=… cargo test --release --lib meeting_end_to_end -- --ignored --nocapture`.
 
+## Avvio automatico e calendario
+
+- [ ] **Avvio della chiamata:** apri una chiamata di prova in Meet ("Verifica audio e video") o FaceTime. Entro circa 7 s compare in alto a destra "Chiamata in …"; "Registra le note" avvia la registrazione.
+- [ ] **"Non ora":** non ripropone finché il microfono resta acceso; alla chiamata successiva propone di nuovo.
+- [ ] **Durante un dettato:** il microfono di VoxLocal non fa partire la proposta.
+- [ ] **Fine chiamata:** chiudi la chiamata lasciando la registrazione attiva. Dopo circa 2 minuti compare "La chiamata sembra finita"; "Ferma e trascrivi" ferma e apre Note riunioni.
+- [ ] **Calendario:**
+  - attivando "Nome e partecipanti dal calendario" macOS chiede l'accesso;
+  - con un evento in corso, la proposta mostra il titolo e la riunione salvata ha titolo e partecipanti;
+  - negando l'accesso, la pagina dice dove riattivarlo.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

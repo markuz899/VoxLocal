@@ -86,6 +86,9 @@ CREATE TABLE meetings (
   summary TEXT
 );
 "#,
+    r#"
+ALTER TABLE meetings ADD COLUMN attendees TEXT NOT NULL DEFAULT '[]';
+"#,
 ];
 
 /// Regole comuni a tutte le modalità: il dettato è dato, non istruzioni (prompt injection).
@@ -218,6 +221,7 @@ pub struct Meeting {
     pub error: Option<String>,
     pub lines: serde_json::Value,
     pub summary: Option<String>,
+    pub attendees: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -583,11 +587,25 @@ impl Storage {
         Ok(slug)
     }
 
-    pub fn insert_meeting(&self, started_at: i64, duration_ms: i64, dir: &str) -> Result<i64> {
+    pub fn insert_meeting(
+        &self,
+        started_at: i64,
+        duration_ms: i64,
+        dir: &str,
+        title: &str,
+        attendees: &[String],
+    ) -> Result<i64> {
         let conn = self.conn.lock().unwrap();
         conn.execute(
-            "INSERT INTO meetings (started_at, duration_ms, dir, status) VALUES (?1, ?2, ?3, 'transcribing')",
-            params![started_at, duration_ms, dir],
+            "INSERT INTO meetings (started_at, duration_ms, dir, status, title, attendees)
+             VALUES (?1, ?2, ?3, 'transcribing', ?4, ?5)",
+            params![
+                started_at,
+                duration_ms,
+                dir,
+                title,
+                serde_json::to_string(attendees)?
+            ],
         )?;
         Ok(conn.last_insert_rowid())
     }
@@ -625,7 +643,7 @@ impl Storage {
     pub fn meetings(&self) -> Result<Vec<Meeting>> {
         let conn = self.conn.lock().unwrap();
         let mut st = conn.prepare(
-            "SELECT id, started_at, duration_ms, title, dir, status, error, summary FROM meetings ORDER BY started_at DESC",
+            "SELECT id, started_at, duration_ms, title, dir, status, error, summary, attendees FROM meetings ORDER BY started_at DESC",
         )?;
         let rows = st.query_map([], |r| {
             Ok(Meeting {
@@ -638,6 +656,7 @@ impl Storage {
                 error: r.get(6)?,
                 lines: serde_json::Value::Array(vec![]),
                 summary: r.get(7)?,
+                attendees: serde_json::from_str(&r.get::<_, String>(8)?).unwrap_or_default(),
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -646,7 +665,7 @@ impl Storage {
     pub fn meeting(&self, id: i64) -> Result<Option<Meeting>> {
         let conn = self.conn.lock().unwrap();
         let mut st = conn.prepare(
-            "SELECT id, started_at, duration_ms, title, dir, status, error, lines, summary FROM meetings WHERE id = ?1",
+            "SELECT id, started_at, duration_ms, title, dir, status, error, lines, summary, attendees FROM meetings WHERE id = ?1",
         )?;
         let mut rows = st.query_map(params![id], |r| {
             let lines: String = r.get(7)?;
@@ -660,6 +679,7 @@ impl Storage {
                 error: r.get(6)?,
                 lines: serde_json::from_str(&lines).unwrap_or(serde_json::Value::Array(vec![])),
                 summary: r.get(8)?,
+                attendees: serde_json::from_str(&r.get::<_, String>(9)?).unwrap_or_default(),
             })
         })?;
         Ok(rows.next().transpose()?)
@@ -1274,7 +1294,13 @@ mod tests {
     #[test]
     fn meetings_are_stored_and_finished() {
         let s = Storage::in_memory().unwrap();
-        let id = s.insert_meeting(1_000, 60_000, "/tmp/m1").unwrap();
+        let id = s
+            .insert_meeting(1_000, 60_000, "/tmp/m1", "", &["Giorgio Bassi".into()])
+            .unwrap();
+        assert_eq!(
+            s.meeting(id).unwrap().unwrap().attendees,
+            vec!["Giorgio Bassi"]
+        );
         assert_eq!(s.meeting(id).unwrap().unwrap().status, "transcribing");
         s.finish_meeting(
             id,
@@ -1290,7 +1316,10 @@ mod tests {
             ("done", "Punto rilascio", Some("Riassunto"))
         );
         assert_eq!(m.lines[0]["text"], "Ciao");
-        let other = s.insert_meeting(2_000, 1_000, "/tmp/m2").unwrap();
+        let other = s
+            .insert_meeting(2_000, 1_000, "/tmp/m2", "Standup", &[])
+            .unwrap();
+        assert_eq!(s.meeting(other).unwrap().unwrap().title, "Standup");
         s.fail_unfinished_meetings().unwrap();
         assert_eq!(s.meeting(other).unwrap().unwrap().status, "error");
         assert_eq!(s.meetings().unwrap().first().unwrap().id, other);

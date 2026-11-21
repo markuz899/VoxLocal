@@ -878,6 +878,7 @@ impl Pipeline {
                 recording: true,
                 started_at: Some(r.started_at),
                 system_error: r.system_error.clone(),
+                mic_silent: r.mic_silent(),
             },
             None => MeetingState::default(),
         }
@@ -1242,6 +1243,8 @@ pub struct MeetingState {
     pub started_at: Option<i64>,
     /// Perché l'audio delle app non si registra (permesso, sistema): si registra solo il microfono.
     pub system_error: Option<String>,
+    /// Il microfono manda solo silenzio assoluto: manca il permesso Microfono.
+    pub mic_silent: bool,
 }
 
 #[derive(Clone, Serialize)]

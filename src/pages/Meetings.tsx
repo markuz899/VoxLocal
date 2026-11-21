@@ -17,6 +17,7 @@ export default function Meetings() {
     recording: false,
     started_at: null,
     system_error: null,
+    mic_silent: false,
   });
   const [list, setList] = useState<Meeting[]>([]);
   const [open, setOpen] = useState<number | null>(null);
@@ -44,6 +45,13 @@ export default function Meetings() {
     ];
     return () => offs.forEach((o) => o.then((f) => f()));
   }, []);
+
+  // durante la registrazione: il microfono muto si scopre solo dopo qualche secondo
+  useEffect(() => {
+    if (!state.recording) return;
+    const id = setInterval(() => api.meetingState().then(setState), 2000);
+    return () => clearInterval(id);
+  }, [state.recording]);
 
   const run = async (f: () => Promise<unknown>) => {
     setError(null);
@@ -175,6 +183,11 @@ function Recorder({
           <Button variant="primary" onClick={onStart}>
             {t("meetings.start")}
           </Button>
+        </div>
+      )}
+      {state.recording && state.mic_silent && (
+        <div className="mt-3">
+          <Notice tone="error" text={t("meetings.micSilent")} />
         </div>
       )}
       {state.recording && state.system_error && (

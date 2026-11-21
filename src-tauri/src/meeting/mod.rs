@@ -7,7 +7,7 @@ mod system_audio;
 use std::fs::File;
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
@@ -110,6 +110,9 @@ pub struct Recording {
     pub started: Instant,
     pub started_at: i64,
     mic: Option<(MicStream, MicWriter)>,
+    /// Almeno un campione diverso da zero dal microfono. Uno zero perfetto per secondi è macOS che
+    /// non concede il microfono (un microfono vero ha sempre un po' di rumore).
+    mic_heard: Arc<AtomicBool>,
     #[cfg(target_os = "macos")]
     system: Option<(system_audio::SystemAudio, Arc<Mutex<TrackWriter>>)>,
     pub system_error: Option<String>,
@@ -132,13 +135,14 @@ impl Recording {
         let dir = root.join(started_at.to_string());
         std::fs::create_dir_all(&dir)?;
 
+        let mic_heard = Arc::new(AtomicBool::new(false));
         // la frequenza del microfono si conosce solo dopo l'apertura: lo scrittore nasce al primo blocco
         // (i campioni dei primi ~100 ms, prima che la frequenza sia nota, si perdono)
         let mic = {
             let path = dir.join("me.wav");
             let writer: MicWriter = Arc::new(Mutex::new(None));
             let rate = Arc::new(AtomicU32::new(0));
-            let (w, r) = (writer.clone(), rate.clone());
+            let (w, r, heard) = (writer.clone(), rate.clone(), mic_heard.clone());
             let stream = MicStream::start(mic_device, move |chunk| {
                 let mut g = w.lock().unwrap();
                 if g.is_none() {
@@ -152,6 +156,9 @@ impl Recording {
                             }
                         },
                     }
+                }
+                if chunk.iter().any(|v| *v != 0.0) {
+                    heard.store(true, Ordering::Relaxed);
                 }
                 if let Some(t) = g.as_mut() {
                     t.push(chunk);
@@ -182,10 +189,18 @@ impl Recording {
             started: Instant::now(),
             started_at,
             mic,
+            mic_heard,
             #[cfg(target_os = "macos")]
             system,
             system_error,
         })
+    }
+
+    /// Dopo 3 s il microfono non ha mandato nemmeno rumore: il permesso Microfono manca.
+    pub fn mic_silent(&self) -> bool {
+        self.mic.is_some()
+            && self.started.elapsed().as_secs() >= 3
+            && !self.mic_heard.load(Ordering::Relaxed)
     }
 
     pub fn stop(self) -> Result<Tracks> {

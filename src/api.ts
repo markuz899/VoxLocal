@@ -51,6 +51,8 @@ export interface MeetingState {
   started_at: number | null;
   /** Perché l'audio delle app non si registra: si registra solo il microfono. */
   system_error: string | null;
+  /** Il microfono manda solo silenzio assoluto: manca il permesso Microfono. */
+  mic_silent: boolean;
 }
 
 export interface MeetingLine {

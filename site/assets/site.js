@@ -189,9 +189,79 @@ function floatingDictations() {
   setInterval(spawn, 1700);
 }
 
+// ---------------------------------------------------------------- meeting notes and ask: small stories that play while on screen
+function whenVisible(el, cls, run) {
+  if (!el || reduced || !('IntersectionObserver' in window)) return;
+  let on = false, playing = false;
+  new IntersectionObserver((es) => { on = es[0].isIntersecting; if (on && !playing) loop(); }, { threshold: 0.35 }).observe(el);
+  root.classList.add(cls);
+  async function loop() {
+    playing = true;
+    while (on && !document.hidden) await run();
+    playing = false;
+  }
+}
+
+function meetingStory() {
+  const box = document.querySelector('.mt');
+  if (!box) return;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const prompt = box.querySelector('[data-mt="prompt"]'), yes = box.querySelector('[data-mt="yes"]');
+  const lines = [...box.querySelectorAll('[data-mt="line"]')], sum = box.querySelector('[data-mt="sum"]');
+  const time = box.querySelector('[data-mt="time"]');
+  const hide = () => { [prompt, ...lines, sum].forEach((e) => e.classList.add('is-hid')); };
+  hide();
+  whenVisible(box, 'mt-live', async () => {
+    hide();
+    time.textContent = '00:00';
+    await wait(500);
+    prompt.classList.remove('is-hid');
+    await wait(1400);
+    yes.classList.add('is-press');
+    await wait(180);
+    yes.classList.remove('is-press');
+    await wait(300);
+    prompt.classList.add('is-hid');
+    const t0 = 130;
+    for (let i = 0; i < lines.length; i++) {
+      await wait(900);
+      const sec = t0 + i * 8;
+      time.textContent = `0${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+      lines[i].classList.remove('is-hid');
+    }
+    await wait(1100);
+    time.textContent = '42:10';
+    sum.classList.remove('is-hid');
+    await wait(4200);
+  });
+}
+
+function askStory() {
+  const box = document.querySelector('.ak');
+  if (!box) return;
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const q = box.querySelector('[data-ak="q"]'), card = box.querySelector('[data-ak="card"]');
+  const src = box.querySelector('[data-ak="src"]'), n1 = box.querySelector('[data-ak-n="1"]');
+  const text = q.textContent;
+  whenVisible(box, 'ak-live', async () => {
+    card.classList.add('is-hid'); src.classList.add('is-hid'); n1.classList.remove('on');
+    q.textContent = '';
+    await wait(400);
+    for (let i = 1; i <= text.length; i++) { q.textContent = text.slice(0, i); await wait(40); }
+    await wait(700);
+    card.classList.remove('is-hid');
+    await wait(1600);
+    n1.classList.add('on');
+    src.classList.remove('is-hid');
+    await wait(4500);
+  });
+}
+
 reveals();
 counters();
 floatingDictations();
 heroStory();
 modeTyping();
 cardLight();
+meetingStory();
+askStory();

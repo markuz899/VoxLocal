@@ -75,6 +75,18 @@ export interface Meeting {
   lines: MeetingLine[];
   summary: string | null;
   attendees: string[];
+  actions: MeetingAction[];
+}
+
+/** Una cosa da fare uscita da una riunione. */
+export interface MeetingAction {
+  who: string;
+  what: string;
+  /** La scadenza come è stata detta ("entro giovedì"). */
+  due: string;
+  /** La stessa scadenza come data, AAAA-MM-GG. */
+  due_date: string | null;
+  done: boolean;
 }
 
 export interface Source {
@@ -291,7 +303,14 @@ export const api = {
   meetingState: () => invoke<MeetingState>("meeting_state"),
   listMeetings: () => invoke<Meeting[]>("list_meetings"),
   getMeeting: (id: number) => invoke<Meeting | null>("get_meeting", { id }),
-  summarizeMeeting: (id: number) => invoke<string>("summarize_meeting", { id }),
+  summarizeMeeting: (id: number) =>
+    invoke<{ summary: string; actions: MeetingAction[] }>("summarize_meeting", {
+      id,
+    }),
+  saveMeetingActions: (id: number, actions: MeetingAction[]) =>
+    invoke<void>("save_meeting_actions", { id, actions }),
+  addMeetingReminders: (id: number) =>
+    invoke<number>("add_meeting_reminders", { id }),
   renameMeeting: (id: number, title: string) =>
     invoke<void>("rename_meeting", { id, title }),
   deleteMeeting: (id: number) => invoke<void>("delete_meeting", { id }),

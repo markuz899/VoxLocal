@@ -120,6 +120,8 @@ pub fn run() {
             commands::palette_run,
             commands::palette_cancel,
             commands::palette_resize,
+            commands::save_meeting_actions,
+            commands::add_meeting_reminders,
             commands::ask,
             commands::ask_target,
             commands::calendar_access,

@@ -400,6 +400,11 @@ const en = {
   "meetings.failed": "Transcription failed",
   "meetings.name": "Meeting name",
   "meetings.resummarize": "Summarize again",
+  "meetings.actions": "Action items",
+  "meetings.actionsOpen": "{n} open",
+  "meetings.toReminders": "Add to Reminders",
+  "meetings.copyActions": "Copy list",
+  "meetings.remindersAdded": "Added to Reminders: {n}.",
   "meetings.deleteConfirm": "Delete meeting and audio",
 
   // backup
@@ -802,6 +807,11 @@ const it: Record<Key, string> = {
   "meetings.failed": "Trascrizione non riuscita",
   "meetings.name": "Nome della riunione",
   "meetings.resummarize": "Riassumi di nuovo",
+  "meetings.actions": "Cose da fare",
+  "meetings.actionsOpen": "{n} da fare",
+  "meetings.toReminders": "Aggiungi a Promemoria",
+  "meetings.copyActions": "Copia elenco",
+  "meetings.remindersAdded": "Aggiunte a Promemoria: {n}.",
   "meetings.deleteConfirm": "Elimina riunione e audio",
 
   "backup.title": "Backup",

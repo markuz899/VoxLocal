@@ -190,6 +190,14 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] **Voce:** tenendo premuto e parlando il comando funziona come prima, senza barra.
 - [ ] **Senza selezione:** un tocco senza testo selezionato mostra l'avviso, nessuna barra.
 
+## Cose da fare dalla riunione
+
+- [ ] **Riassumi** una riunione in cui qualcuno promette qualcosa ("preparo le note entro giovedì"): compare "Cose da fare" con chi, cosa e scadenza.
+- [ ] **Spunta e togli** una voce, cambia pagina e torna: la modifica è rimasta.
+- [ ] **Aggiungi a Promemoria:** la prima volta macOS chiede il permesso; le voci aperte compaiono in Promemoria con la data e la riunione nelle note.
+- [ ] **Copia elenco** incolla una lista Markdown a caselle.
+- [ ] **Riunione senza impegni:** nessuna sezione "Cose da fare".
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

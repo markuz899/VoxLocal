@@ -563,3 +563,25 @@ pub fn delete_meeting(p: P, id: i64) -> R<()> {
 pub fn screen_permission(request: bool) -> bool {
     crate::meeting::screen_permission(request)
 }
+
+/// Chiude la proposta di registrare o fermare una riunione.
+#[tauri::command]
+pub fn prompt_close(app: AppHandle) {
+    crate::meeting_watch::close(&app);
+}
+
+/// Apre la finestra principale su una sezione (dalla proposta riunione).
+#[tauri::command]
+pub fn open_section(app: AppHandle, section: String) {
+    crate::open_main(&app, Some(&section));
+}
+
+/// Il permesso Calendari: "granted", "denied" o "undetermined"; `request` apre la richiesta di sistema.
+#[tauri::command]
+pub async fn calendar_access(request: bool) -> String {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::meeting::calendar::access(request).to_string()
+    })
+    .await
+    .unwrap_or_else(|_| "denied".into())
+}

@@ -8,7 +8,7 @@ import {
 } from "../api";
 import { useSettings } from "../App";
 import { useT } from "../i18n";
-import { Button, Notice, PageTitle, Select, TextInput } from "../ui";
+import { Button, Notice, PageTitle, Select, TextInput, Toggle } from "../ui";
 import { clock } from "./Files";
 
 export default function Meetings() {
@@ -84,6 +84,7 @@ export default function Meetings() {
         }
       />
       <Notice tone="error" text={error} />
+      <Options />
 
       {list.length === 0 ? (
         <p className="text-muted">{t("meetings.empty")}</p>
@@ -278,6 +279,11 @@ function Detail({
           }
         />
         <span className="text-[12px] text-muted">{clock(m.duration_ms)}</span>
+        {m.attendees.length > 0 && (
+          <p className="m-0 w-full text-[12px] text-muted">
+            {t("meetings.attendees", { names: m.attendees.join(", ") })}
+          </p>
+        )}
       </div>
 
       {m.status === "transcribing" && (
@@ -410,5 +416,57 @@ function MicPicker() {
         ...devices.map((d): [string, string] => [d, d]),
       ]}
     />
+  );
+}
+
+/** Proposta automatica a inizio chiamata e nome dal calendario. */
+function Options() {
+  const t = useT();
+  const { settings, update } = useSettings();
+  const [calendar, setCalendar] = useState<string | null>(null);
+  useEffect(() => {
+    api.calendarAccess(false).then(setCalendar);
+  }, []);
+  const toggleCalendar = async (on: boolean) => {
+    if (on) {
+      const status = await api.calendarAccess(true);
+      setCalendar(status);
+      if (status !== "granted") return;
+    }
+    await update({ meeting_calendar: on });
+  };
+  return (
+    <div className="mb-6 divide-y divide-line rounded-[10px] border border-line bg-surface">
+      <label className="flex items-center gap-4 px-4 py-3">
+        <span className="flex-1">
+          <span className="block">{t("meetings.autoDetect")}</span>
+          <span className="block text-[12px] text-muted">
+            {t("meetings.autoDetectHint")}
+          </span>
+        </span>
+        <Toggle
+          label={t("meetings.autoDetect")}
+          checked={settings.meeting_auto_detect}
+          onChange={(v) => update({ meeting_auto_detect: v })}
+        />
+      </label>
+      <label className="flex items-center gap-4 px-4 py-3">
+        <span className="flex-1">
+          <span className="block">{t("meetings.calendar")}</span>
+          <span
+            className={`block text-[12px] ${calendar === "denied" ? "text-warn" : "text-muted"}`}
+          >
+            {calendar === "denied"
+              ? t("meetings.calendarDenied")
+              : t("meetings.calendarHint")}
+          </span>
+        </span>
+        <Toggle
+          label={t("meetings.calendar")}
+          checked={settings.meeting_calendar && calendar === "granted"}
+          onChange={toggleCalendar}
+        />
+      </label>
+    </div>
   );
 }

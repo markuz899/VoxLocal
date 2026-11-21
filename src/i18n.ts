@@ -361,6 +361,15 @@ const en = {
   "meetings.permission":
     "To record the other people too, VoxLocal needs Screen Recording permission (only the audio is used).",
   "meetings.grant": "Grant permission",
+  "meetings.autoDetect": "Offer to record when a call starts",
+  "meetings.autoDetectHint":
+    "When Zoom, Teams, Meet or another call app uses the microphone, VoxLocal asks with a small window. At the end of the call it offers to stop.",
+  "meetings.calendar": "Name and attendees from the calendar",
+  "meetings.calendarHint":
+    "The meeting takes the title and the attendees of the event in progress. VoxLocal only reads the calendar.",
+  "meetings.calendarDenied":
+    "Calendar access is off: turn VoxLocal on in System Settings → Privacy & Security → Calendars.",
+  "meetings.attendees": "With {names}",
   "meetings.micSilent":
     "Your microphone is sending no sound, so your voice will be missing. Stop, pick the microphone you are speaking into next to the Start button, and start again. If it is already the right one, check System Settings → Privacy & Security → Microphone: VoxLocal must be on.",
   "meetings.empty": "No meetings yet.",
@@ -732,6 +741,15 @@ const it: Record<Key, string> = {
   "meetings.permission":
     "Per registrare anche gli altri, VoxLocal ha bisogno del permesso Registrazione schermo (usa solo l'audio).",
   "meetings.grant": "Concedi il permesso",
+  "meetings.autoDetect": "Proponi di registrare quando inizia una chiamata",
+  "meetings.autoDetectHint":
+    "Quando Zoom, Teams, Meet o un'altra app da chiamata usa il microfono, VoxLocal lo chiede con una piccola finestra. A fine chiamata propone di fermare.",
+  "meetings.calendar": "Nome e partecipanti dal calendario",
+  "meetings.calendarHint":
+    "La riunione prende il titolo e i partecipanti dell'evento in corso. VoxLocal legge soltanto il calendario.",
+  "meetings.calendarDenied":
+    "L'accesso al calendario è spento: attiva VoxLocal in Impostazioni di Sistema → Privacy e sicurezza → Calendari.",
+  "meetings.attendees": "Con {names}",
   "meetings.micSilent":
     "Il microfono non manda nessun suono, quindi la tua voce mancherà. Ferma, scegli accanto al pulsante di avvio il microfono in cui stai parlando e riavvia. Se è già quello giusto, controlla Impostazioni di Sistema → Privacy e sicurezza → Microfono: VoxLocal deve essere attivo.",
   "meetings.empty": "Ancora nessuna riunione.",

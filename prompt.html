@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <title>VoxLocal</title>
+    <link rel="stylesheet" href="/src/prompt/prompt.css" />
+  </head>
+  <body>
+    <div class="card" role="alertdialog" aria-labelledby="q">
+      <div class="head"><span class="dot" aria-hidden="true"></span><span id="q"></span></div>
+      <p id="sub"></p>
+      <div class="row">
+        <button type="button" id="no"></button>
+        <button type="button" id="yes" class="primary"></button>
+      </div>
+    </div>
+    <script type="module" src="/src/prompt/prompt.ts"></script>
+  </body>
+</html>

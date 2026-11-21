@@ -30,6 +30,8 @@ export interface Settings {
   command_hotkey: string;
   translate_to: string;
   vocab_dismissed: string[];
+  meeting_auto_detect: boolean;
+  meeting_calendar: boolean;
 }
 
 export interface Segment {
@@ -72,6 +74,7 @@ export interface Meeting {
   error: string | null;
   lines: MeetingLine[];
   summary: string | null;
+  attendees: string[];
 }
 
 export interface ImportResult {
@@ -271,6 +274,10 @@ export const api = {
   renameMeeting: (id: number, title: string) =>
     invoke<void>("rename_meeting", { id, title }),
   deleteMeeting: (id: number) => invoke<void>("delete_meeting", { id }),
+  calendarAccess: (request: boolean) =>
+    invoke<"granted" | "denied" | "undetermined">("calendar_access", {
+      request,
+    }),
   screenPermission: (request: boolean) =>
     invoke<boolean>("screen_permission", { request }),
   importSettings: () => invoke<ImportResult | null>("import_settings"),

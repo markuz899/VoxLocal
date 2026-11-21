@@ -60,6 +60,10 @@ pub struct Settings {
     pub translate_to: String,
     /// Parole suggerite per il vocabolario che l'utente ha scartato: non si ripropongono.
     pub vocab_dismissed: Vec<String>,
+    /// Propone di registrare le note quando inizia una chiamata (microfono in uso + app da chiamata).
+    pub meeting_auto_detect: bool,
+    /// Prende titolo e partecipanti della riunione dall'evento in corso nel calendario.
+    pub meeting_calendar: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -97,6 +101,8 @@ impl Default for Settings {
             command_hotkey: "Alt+Shift+Space".into(),
             translate_to: "en".into(),
             vocab_dismissed: vec![],
+            meeting_auto_detect: true,
+            meeting_calendar: false,
         }
     }
 }

@@ -257,6 +257,17 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
   - titolo e partecipanti vanno nella riunione (migrazione 6, colonna `attendees`) e la proposta mostra già il titolo.
 - **Windows e Linux:** nessuna rilevazione per ora; si avvia a mano.
 
+## D51 — "Chiedi alle tue riunioni": ricerca testuale e citazioni
+- **Ricerca:** le righe delle riunioni entrano in un indice FTS5 (`meeting_lines_fts`, migrazione 7, riempita anche con le riunioni già registrate) accanto a quello dei dettati.
+- **Dalla domanda alla query:**
+  - si tengono le parole utili (stop list italiano/inglese) come prefisso, cioè la parola meno 2 lettere ("rilascio" → "rilasc*"), così trovano le varianti;
+  - ogni riga trovata arriva con la precedente e la successiva;
+  - le righe già coperte dal contesto di un brano vicino non si ripetono.
+- **Domande senza parole chiave** ("cosa devo fare?"): si aggiungono i riassunti, o alcune righe, delle riunioni degli ultimi 7 giorni.
+- **Risposta:** all'LLM predefinito vanno al massimo 24 brani numerati con riunione, giorno e minuto. Risponde solo da quelli, cita [n] e dice quando le fonti non bastano. Nella UI i numeri aprono la fonte e da lì la riunione.
+- **Privacy:** la pagina dice se il provider è locale (OpenAI-compatibile su localhost: Ollama, LM Studio) o se le frasi trovate escono verso il provider.
+- **Rimandato:** la ricerca per significato (embedding: un modello locale in più, circa 100 MB, e un indice). Si aggiunge se le domande reali perdono brani ovvi.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

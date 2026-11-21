@@ -173,6 +173,14 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
   - con un evento in corso, la proposta mostra il titolo e la riunione salvata ha titolo e partecipanti;
   - negando l'accesso, la pagina dice dove riattivarlo.
 
+## Chiedi alle tue riunioni
+
+- [ ] **Domanda con parole chiave** ("Cosa abbiamo deciso sul rilascio?"): la risposta cita [n]; cliccando un numero si vede la frase, "Apri la riunione" apre quella riunione.
+- [ ] **Domanda senza parole chiave** ("Cosa devo fare questa settimana?"): risponde dalle riunioni recenti.
+- [ ] **Domanda su qualcosa mai detto:** dice che non ha trovato nulla, senza inventare.
+- [ ] **Avviso privacy:** con un provider cloud compare l'avviso arancione; con Ollama "restano su questo computer".
+- [ ] **Riunione eliminata:** non compare più tra le fonti.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

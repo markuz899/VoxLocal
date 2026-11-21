@@ -370,6 +370,28 @@ const en = {
   "meetings.calendarDenied":
     "Calendar access is off: turn VoxLocal on in System Settings → Privacy & Security → Calendars.",
   "meetings.attendees": "With {names}",
+  // ask
+  "nav.ask": "Ask",
+  "ask.title": "Ask your meetings",
+  "ask.description":
+    "Ask about what was said in your meetings and dictations. The answer cites the lines it comes from.",
+  "ask.placeholder": "What did we decide about the release?",
+  "ask.send": "Ask",
+  "ask.thinking": "Searching…",
+  "ask.local": "The lines found stay on this computer ({name}).",
+  "ask.cloud":
+    "The lines found are sent to {name} to write the answer. Use Ollama to keep everything on this computer.",
+  "ask.noLlm": "Choose an LLM provider in LLM providers to ask questions.",
+  "ask.example1": "What did we decide this week?",
+  "ask.example2": "What do I have to do?",
+  "ask.example3": "Who is preparing the release notes?",
+  "ask.source": "Source {n}",
+  "ask.basedOn": "Based on {n} lines from your meetings and dictations.",
+  "ask.meeting": "Meeting",
+  "ask.dictation": "Dictation",
+  "ask.openMeeting": "Open the meeting",
+  "ask.openHistory": "Open history",
+
   "meetings.micSilent":
     "Your microphone is sending no sound, so your voice will be missing. Stop, pick the microphone you are speaking into next to the Start button, and start again. If it is already the right one, check System Settings → Privacy & Security → Microphone: VoxLocal must be on.",
   "meetings.empty": "No meetings yet.",
@@ -750,6 +772,27 @@ const it: Record<Key, string> = {
   "meetings.calendarDenied":
     "L'accesso al calendario è spento: attiva VoxLocal in Impostazioni di Sistema → Privacy e sicurezza → Calendari.",
   "meetings.attendees": "Con {names}",
+  "nav.ask": "Chiedi",
+  "ask.title": "Chiedi alle tue riunioni",
+  "ask.description":
+    "Fai domande su quello che è stato detto nelle riunioni e nei dettati. La risposta cita le frasi da cui viene.",
+  "ask.placeholder": "Cosa abbiamo deciso sul rilascio?",
+  "ask.send": "Chiedi",
+  "ask.thinking": "Cerco…",
+  "ask.local": "Le frasi trovate restano su questo computer ({name}).",
+  "ask.cloud":
+    "Le frasi trovate vengono inviate a {name} per scrivere la risposta. Con Ollama tutto resta su questo computer.",
+  "ask.noLlm": "Scegli un provider LLM in Provider LLM per fare domande.",
+  "ask.example1": "Cosa abbiamo deciso questa settimana?",
+  "ask.example2": "Cosa devo fare?",
+  "ask.example3": "Chi prepara le note di rilascio?",
+  "ask.source": "Fonte {n}",
+  "ask.basedOn": "Basata su {n} frasi delle tue riunioni e dei dettati.",
+  "ask.meeting": "Riunione",
+  "ask.dictation": "Dettato",
+  "ask.openMeeting": "Apri la riunione",
+  "ask.openHistory": "Apri la cronologia",
+
   "meetings.micSilent":
     "Il microfono non manda nessun suono, quindi la tua voce mancherà. Ferma, scegli accanto al pulsante di avvio il microfono in cui stai parlando e riavvia. Se è già quello giusto, controlla Impostazioni di Sistema → Privacy e sicurezza → Microfono: VoxLocal deve essere attivo.",
   "meetings.empty": "Ancora nessuna riunione.",
@@ -1012,6 +1055,10 @@ export const FAQ: Record<
         "Start them before a call: your microphone and the audio of the call are recorded as two tracks, transcribed on this computer with “Me” and “Others”, and summarized with decisions and next steps. On Mac it needs Screen Recording permission, used for the audio only.",
       ],
       [
+        "Can I ask questions about my meetings?",
+        "Yes. In Ask, write a question like “What did we decide about the release?”: VoxLocal finds the lines in your meetings and dictations and the LLM answers citing them. With Ollama nothing leaves your computer.",
+      ],
+      [
         "What if the LLM does not answer?",
         "VoxLocal pastes the transcription anyway after 15 seconds and tells you. A dictation is never lost: it is always in the history.",
       ],
@@ -1096,6 +1143,10 @@ export const FAQ: Record<
       [
         "Come funzionano le note riunioni?",
         "Le avvii prima di una chiamata: il tuo microfono e l'audio della chiamata vengono registrati in due tracce, trascritti su questo computer con “Io” e “Altri” e riassunti con decisioni e cose da fare. Su Mac serve il permesso Registrazione schermo, usato solo per l'audio.",
+      ],
+      [
+        "Posso fare domande sulle mie riunioni?",
+        "Sì. In Chiedi scrivi una domanda come “Cosa abbiamo deciso sul rilascio?”: VoxLocal trova le frasi nelle riunioni e nei dettati e l'LLM risponde citandole. Con Ollama nulla lascia il computer.",
       ],
       [
         "E se l'LLM non risponde?",

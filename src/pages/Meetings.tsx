@@ -28,7 +28,14 @@ export default function Meetings() {
   const reload = () =>
     api.listMeetings().then((l) => {
       setList(l);
-      setOpen((o) => o ?? l[0]?.id ?? null);
+      // aperta da una fonte di "Chiedi": quella riunione
+      const wanted = Number(sessionStorage.getItem("openMeeting"));
+      sessionStorage.removeItem("openMeeting");
+      setOpen((o) =>
+        wanted && l.some((m) => m.id === wanted)
+          ? wanted
+          : (o ?? l[0]?.id ?? null),
+      );
     });
 
   useEffect(() => {

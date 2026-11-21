@@ -585,3 +585,13 @@ pub async fn calendar_access(request: bool) -> String {
     .await
     .unwrap_or_else(|_| "denied".into())
 }
+
+#[tauri::command]
+pub async fn ask(p: P<'_>, question: String) -> R<crate::pipeline::Answer> {
+    p.ask(&question).await.map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn ask_target(p: P) -> crate::pipeline::AskTarget {
+    p.ask_target()
+}

@@ -570,6 +570,24 @@ pub fn prompt_close(app: AppHandle) {
     crate::meeting_watch::close(&app);
 }
 
+/// La barra dei comandi: parole selezionate e comandi recenti.
+#[tauri::command]
+pub fn palette_data(p: P) -> crate::pipeline::PaletteData {
+    p.palette_data()
+}
+
+/// Applica alla selezione il comando scritto nella barra.
+#[tauri::command]
+pub fn palette_run(p: P, instruction: String) {
+    p.palette_run(instruction);
+}
+
+/// Chiude la barra senza comando.
+#[tauri::command]
+pub fn palette_cancel(p: P) {
+    p.palette_cancel(true);
+}
+
 /// Apre la finestra principale su una sezione (dalla proposta riunione).
 #[tauri::command]
 pub fn open_section(app: AppHandle, section: String) {

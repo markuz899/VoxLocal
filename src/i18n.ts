@@ -207,6 +207,7 @@ const en = {
   "meta.processing": "Processing",
   "meta.none": "None",
   "meta.local": "Local",
+  "meta.typed": "Typed in the command bar",
   "time.audio": "Audio",
   "time.transcription": "Transcription",
   "time.processing": "Processing",
@@ -614,6 +615,7 @@ const it: Record<Key, string> = {
   "meta.processing": "Elaborazione",
   "meta.none": "Nessuna",
   "meta.local": "Locale",
+  "meta.typed": "Scritto nella barra dei comandi",
   "time.audio": "Audio",
   "time.transcription": "Trascrizione",
   "time.processing": "Elaborazione",
@@ -988,7 +990,7 @@ export const FAQ: Record<
       ],
       [
         "What is the selection command?",
-        "Select some text in any app, hold ⌥⇧ Space (Alt+Shift+Space) and say what to do with it: “make it more formal”, “translate into German”, “turn it into a list”. VoxLocal replaces the selection with the result. It needs an LLM provider.",
+        "Select some text in any app, hold ⌥⇧ Space (Alt+Shift+Space) and say what to do with it: “make it more formal”, “translate into German”, “turn it into a list”. Tap the shortcut instead of holding it to type the command, or pick a recent one. VoxLocal replaces the selection with the result. It needs an LLM provider.",
       ],
       [
         "What are modes?",
@@ -1078,7 +1080,7 @@ export const FAQ: Record<
       ],
       [
         "Cos'è il comando sulla selezione?",
-        "Selezioni un testo in qualsiasi app, tieni premuto ⌥⇧ Spazio (Alt+Shift+Spazio) e dici cosa farne: “rendilo più formale”, “traducilo in tedesco”, “fanne un elenco”. VoxLocal sostituisce la selezione con il risultato. Serve un provider LLM.",
+        "Selezioni un testo in qualsiasi app, tieni premuto ⌥⇧ Spazio (Alt+Shift+Spazio) e dici cosa farne: “rendilo più formale”, “traducilo in tedesco”, “fanne un elenco”. Se tocchi la scorciatoia invece di tenerla premuta puoi scrivere il comando, o sceglierne uno recente. VoxLocal sostituisce la selezione con il risultato. Serve un provider LLM.",
       ],
       [
         "Cosa sono le modalità?",

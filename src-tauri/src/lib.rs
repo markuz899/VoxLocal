@@ -8,6 +8,7 @@ pub mod meeting;
 mod meeting_watch;
 pub mod models;
 mod overlay;
+mod palette;
 pub mod paste;
 mod permissions;
 pub mod pipeline;
@@ -115,6 +116,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::meeting_start,
             commands::prompt_close,
+            commands::palette_data,
+            commands::palette_run,
+            commands::palette_cancel,
             commands::ask,
             commands::ask_target,
             commands::calendar_access,

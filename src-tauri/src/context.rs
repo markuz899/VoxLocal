@@ -8,6 +8,18 @@ pub fn frontmost_app() -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// Il processo dell'app in primo piano, per ridarle il focus dopo la barra dei comandi.
+pub fn frontmost_pid() -> Option<i32> {
+    imp::frontmost_pid()
+}
+
+/// Riporta in primo piano l'app `pid` (la selezione resta quella di prima).
+pub fn activate(pid: Option<i32>) {
+    if let Some(pid) = pid {
+        imp::activate(pid);
+    }
+}
+
 #[cfg(target_os = "macos")]
 mod imp {
     use objc2::msg_send;
@@ -25,10 +37,42 @@ mod imp {
             Some(name?.to_string())
         }
     }
+
+    pub fn frontmost_pid() -> Option<i32> {
+        let cls = AnyClass::get(c"NSWorkspace")?;
+        // SAFETY: come sopra, solo letture.
+        unsafe {
+            let ws: Option<Retained<AnyObject>> = msg_send![cls, sharedWorkspace];
+            let app: Option<Retained<AnyObject>> = msg_send![&*ws?, frontmostApplication];
+            let pid: i32 = msg_send![&*app?, processIdentifier];
+            Some(pid)
+        }
+    }
+
+    pub fn activate(pid: i32) {
+        let Some(cls) = AnyClass::get(c"NSRunningApplication") else {
+            return;
+        };
+        // SAFETY: runningApplicationWithProcessIdentifier: può restituire nil (app chiusa), gestito.
+        unsafe {
+            let app: Option<Retained<AnyObject>> =
+                msg_send![cls, runningApplicationWithProcessIdentifier: pid];
+            if let Some(app) = app {
+                // NSApplicationActivateAllWindows (1) | ActivateIgnoringOtherApps (2)
+                let _: bool = msg_send![&*app, activateWithOptions: 3usize];
+            }
+        }
+    }
 }
 
 #[cfg(windows)]
 mod imp {
+    // ponytail: su Windows chiudere la barra ridà il focus alla finestra di prima; pid non serve
+    pub fn frontmost_pid() -> Option<i32> {
+        None
+    }
+    pub fn activate(_pid: i32) {}
+
     use windows_sys::Win32::Foundation::CloseHandle;
     use windows_sys::Win32::System::Threading::{
         OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
@@ -76,6 +120,10 @@ mod imp {
     pub fn frontmost() -> Option<String> {
         None
     }
+    pub fn frontmost_pid() -> Option<i32> {
+        None
+    }
+    pub fn activate(_pid: i32) {}
 }
 
 /// Regola "app → modalità": vince la prima il cui nome è contenuto in quello dell'app (senza maiuscole).

@@ -5,7 +5,8 @@
   "windows": [
     "main",
     "overlay",
-    "prompt"
+    "prompt",
+    "palette"
   ],
   "permissions": [
     "core:default"

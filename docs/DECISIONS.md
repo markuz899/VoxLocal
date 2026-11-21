@@ -192,6 +192,28 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Template:** `{{target_language}}` diventa il nome inglese della lingua ("German"), che l'LLM capisce meglio di un codice.
 - **Modalità di traduzione:** la migrazione 3 aggiorna la modalità predefinita (slug `translate_en`, mantenuto per compatibilità) e il suo nome diventa "Traduci" / "Translate".
 
+## D43 — Statistiche misurate, non dichiarate
+- **Parole:** contate sul testo finale dei dettati, esclusi comandi e dettati annullati o in errore.
+- **Velocità:** parole diviso per la durata dell'audio.
+- **Tempo risparmiato:** tempo di battitura a 40 parole al minuto, meno il tempo passato a parlare. Il 40 è dichiarato nella UI.
+- **Giorni:** calcolati nel fuso dell'utente, che la UI passa al backend.
+- **Grafico:** barre CSS sottili, colore validato con lo script della skill dataviz su chiaro e scuro, tabella nascosta per gli screen reader.
+
+## D44 — Snippet: solo corrispondenza dell'intero dettato
+- Un dettato che coincide con una frase salvata (minuscole, senza punteggiatura) viene sostituito dal testo e salta le modalità.
+- **Escluso apposta:** l'espansione dentro una frase più lunga, perché sostituirebbe parole dette per altri motivi. Si aggiunge se serve.
+
+## D45 — Correzioni e formattazione a voce nelle regole comuni
+- **Nelle regole di ogni modalità LLM:** chi si corregge ("anzi", "no, volevo dire") viene riscritto con la versione corretta; "a capo", "nuovo paragrafo" e "punto elenco" vengono applicati, non scritti.
+- **Aggiornamento automatico all'avvio:** le modalità predefinite il cui prompt è ancora quello di fabbrica (vecchie regole, più `OLD_TASKS`) passano alla versione nuova; quelle modificate dall'utente restano com'erano. C'è un test su un database riaperto.
+
+## D46 — Voce bassa e vocabolario che impara
+- **Voce bassa:** `boost_quiet` porta il picco a 0,7 (al massimo ×12) quando è sotto 0,25. La soglia del silenzio scende a RMS 0,001 più un picco minimo di 0,015, così il sussurro passa e il silenzio vero no.
+- **Suggerimenti per il vocabolario:**
+  - parole maiuscole non a inizio frase, sigle, maiuscole interne o cifre, presenti in almeno due dettati;
+  - niente NLP: i falsi positivi si scartano dalla UI e restano in `vocab_dismissed`;
+  - dalla Cronologia la parola selezionata si aggiunge direttamente.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

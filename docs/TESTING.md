@@ -133,6 +133,16 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] Modalità → Aggiungi dalla libreria: la modalità aggiunta compare nell'elenco e nel tray; il pulsante diventa "Added".
 - [ ] Generale → Traduci in: Tedesco. Con la modalità Translate, un dettato in italiano esce in tedesco.
 
+## Statistiche, snippet, correzioni, voce bassa, vocabolario
+
+- [ ] **Statistiche:** dopo qualche dettato i numeri tornano (parole, tempo risparmiato, velocità, dettati), il grafico mostra oggi a destra e il passaggio del mouse dà giorno e parole.
+- [ ] **Snippet:** crea "my address" → "Via Roma, Milano"; dettando solo "my address" viene incollato l'indirizzo, mentre in "send my address to Luca" non succede.
+- [ ] **Modalità Pulito:**
+  - "la riunione è alle 3, anzi alle 4" diventa "La riunione è alle 4.";
+  - "primo punto latte a capo secondo punto pane" va a capo invece di scrivere "a capo".
+- [ ] **Voce sussurrata** a 30 cm dal microfono: la trascrizione è corretta e nel log compare "voce bassa: guadagno ×…". Il silenzio puro continua a essere scartato.
+- [ ] **Vocabolario:** i suggerimenti compaiono dopo che un nome torna in almeno due dettati; "×" lo nasconde per sempre, "+" lo aggiunge. Dalla Cronologia, selezionando una parola, "Add the selection to the vocabulary" la aggiunge.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

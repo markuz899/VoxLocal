@@ -160,7 +160,18 @@ impl SystemAudio {
                         break;
                     }
                     match display_filter() {
-                        Ok(f) => unsafe { s.0.updateContentFilter_completionHandler(&f, None) },
+                        // ScreenCaptureKit chiama il gestore anche quando è nil: un blocco nullo manda l'app in crash
+                        Ok(f) => {
+                            let done = RcBlock::new(|e: *mut NSError| {
+                                if let Some(e) = unsafe { e.as_ref() } {
+                                    log::warn!(
+                                        "rinnovo del filtro audio: {}",
+                                        e.localizedDescription()
+                                    );
+                                }
+                            });
+                            unsafe { s.0.updateContentFilter_completionHandler(&f, Some(&done)) }
+                        }
                         Err(e) => log::warn!("rinnovo del filtro audio: {e:#}"),
                     }
                 }

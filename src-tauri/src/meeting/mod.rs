@@ -476,7 +476,8 @@ mod tests {
             .unwrap();
         let rec = Recording::start(&tmp, None).unwrap();
         println!("audio delle app: {:?}", rec.system_error);
-        std::thread::sleep(std::time::Duration::from_secs(9));
+        // oltre i 10 s: il filtro delle app si rinnova almeno una volta (lì c'era un crash)
+        std::thread::sleep(std::time::Duration::from_secs(14));
         let tracks = rec.stop().unwrap();
         let _ = player.wait();
         let stt = crate::stt::LocalWhisper::new(model.into(), None);

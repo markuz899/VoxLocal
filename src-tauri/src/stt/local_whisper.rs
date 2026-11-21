@@ -166,6 +166,7 @@ impl LocalWhisper {
             .filter(|t| !t.is_empty())
             .collect::<Vec<_>>()
             .join(" ");
+        let text = drop_repeated_sentences(&text);
         let language =
             whisper_rs::get_lang_str(state.full_lang_id_from_state()).map(str::to_string);
 
@@ -190,6 +191,30 @@ fn audio_ctx(samples: usize, min_ctx: i32) -> i32 {
 
 const DEFAULT_MIN_CTX: i32 = 512;
 
+/// Whisper a volte riscrive la stessa frase due volte di fila ("…sala grande. La riunione è…
+/// sala grande."): si tiene la prima. Solo frasi di almeno 4 parole, così "Sì. Sì." resta.
+// ponytail: confronto esatto senza punteggiatura; ripetizioni parziali non le prende.
+fn drop_repeated_sentences(text: &str) -> String {
+    let key = |s: &str| {
+        s.chars()
+            .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+            .collect::<String>()
+            .to_lowercase()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    };
+    let mut out: Vec<&str> = vec![];
+    for sentence in text.split_inclusive(['.', '!', '?']) {
+        let k = key(sentence);
+        let repeat = out.last().is_some_and(|prev| key(prev) == k);
+        if !(repeat && k.split(' ').count() >= 4) {
+            out.push(sentence);
+        }
+    }
+    out.concat().trim().to_string()
+}
+
 unsafe extern "C" fn abort_if_cancelled(user_data: *mut c_void) -> bool {
     (*(user_data as *const CancellationToken)).is_cancelled()
 }
@@ -203,5 +228,23 @@ impl SttProvider for LocalWhisper {
     async fn transcribe(&self, audio: &AudioBuffer, opts: &SttOptions) -> Result<Transcript> {
         let (me, audio, opts) = (self.clone(), audio.clone(), opts.clone());
         tokio::task::spawn_blocking(move || me.transcribe_blocking(&audio, &opts)).await?
+    }
+}
+
+#[cfg(test)]
+mod repeat_tests {
+    use super::drop_repeated_sentences as d;
+
+    #[test]
+    fn drops_whole_sentence_repeated_by_whisper() {
+        assert_eq!(
+            d("La riunione è alle 3, anzi alle 4, nella sala grande. La riunione è alle 3, anzi alle 4, nella sala grande."),
+            "La riunione è alle 3, anzi alle 4, nella sala grande."
+        );
+        assert_eq!(d("Sì. Sì. Va bene."), "Sì. Sì. Va bene.");
+        assert_eq!(
+            d("Prima frase qui ok. Seconda frase diversa ora."),
+            "Prima frase qui ok. Seconda frase diversa ora."
+        );
     }
 }

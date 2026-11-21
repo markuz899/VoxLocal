@@ -77,6 +77,27 @@ export interface Meeting {
   attendees: string[];
 }
 
+export interface Source {
+  kind: "meeting" | "dictation";
+  id: number;
+  title: string;
+  at: number;
+  offset_ms: number | null;
+  text: string;
+}
+
+export interface Answer {
+  text: string;
+  sources: Source[];
+}
+
+export interface AskTarget {
+  label: string;
+  /** Il provider gira su questo computer: i brani non escono. */
+  local: boolean;
+  available: boolean;
+}
+
 export interface ImportResult {
   terms: number;
   snippets: number;
@@ -274,6 +295,8 @@ export const api = {
   renameMeeting: (id: number, title: string) =>
     invoke<void>("rename_meeting", { id, title }),
   deleteMeeting: (id: number) => invoke<void>("delete_meeting", { id }),
+  ask: (question: string) => invoke<Answer>("ask", { question }),
+  askTarget: () => invoke<AskTarget>("ask_target"),
   calendarAccess: (request: boolean) =>
     invoke<"granted" | "denied" | "undetermined">("calendar_access", {
       request,

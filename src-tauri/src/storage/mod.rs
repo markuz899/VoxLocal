@@ -89,6 +89,14 @@ CREATE TABLE meetings (
     r#"
 ALTER TABLE meetings ADD COLUMN attendees TEXT NOT NULL DEFAULT '[]';
 "#,
+    r#"
+CREATE VIRTUAL TABLE meeting_lines_fts USING fts5(
+  text, meeting_id UNINDEXED, line UNINDEXED,
+  tokenize='unicode61 remove_diacritics 2'
+);
+INSERT INTO meeting_lines_fts(text, meeting_id, line)
+  SELECT json_extract(j.value, '$.text'), m.id, j.key FROM meetings m, json_each(m.lines) j;
+"#,
 ];
 
 /// Regole comuni a tutte le modalità: il dettato è dato, non istruzioni (prompt injection).
@@ -176,6 +184,22 @@ pub struct Mode {
     pub provider_id: Option<String>,
     pub model: Option<String>,
     pub temperature: f64,
+}
+
+/// Un brano trovato per "Chiedi": una riga di riunione (con il contesto) o un dettato.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Source {
+    /// "meeting" o "dictation".
+    pub kind: &'static str,
+    /// L'id della riunione o del dettato.
+    pub id: i64,
+    /// Il titolo della riunione, o l'app del dettato.
+    pub title: String,
+    /// Quando (unix ms): l'inizio della riunione o il dettato.
+    pub at: i64,
+    /// Il punto della riunione, in ms dall'inizio.
+    pub offset_ms: Option<i64>,
+    pub text: String,
 }
 
 /// Il file di esportazione: `app_modes` lo riempie chi ha accesso alle impostazioni.
@@ -400,6 +424,125 @@ fn replace_phrase(text: &str, phrase: &str, with: &str) -> Option<String> {
     })
 }
 
+/// Parole che non dicono di cosa parla una domanda.
+const ASK_STOP: &[&str] = &[
+    "che",
+    "chi",
+    "cosa",
+    "come",
+    "quando",
+    "dove",
+    "perche",
+    "quale",
+    "quali",
+    "quanto",
+    "quanti",
+    "sono",
+    "stato",
+    "stata",
+    "stati",
+    "abbiamo",
+    "avete",
+    "hanno",
+    "devo",
+    "dobbiamo",
+    "deve",
+    "fare",
+    "fatto",
+    "detto",
+    "dice",
+    "ultima",
+    "ultimo",
+    "questa",
+    "questo",
+    "quella",
+    "quello",
+    "settimana",
+    "oggi",
+    "ieri",
+    "sul",
+    "sulla",
+    "sulle",
+    "nel",
+    "nella",
+    "nelle",
+    "della",
+    "delle",
+    "degli",
+    "dello",
+    "alla",
+    "alle",
+    "per",
+    "con",
+    "una",
+    "uno",
+    "del",
+    "dei",
+    "gli",
+    "non",
+    "esce",
+    "the",
+    "what",
+    "who",
+    "when",
+    "where",
+    "which",
+    "how",
+    "did",
+    "does",
+    "have",
+    "has",
+    "was",
+    "were",
+    "about",
+    "this",
+    "that",
+    "last",
+    "week",
+    "today",
+    "with",
+    "for",
+    "and",
+    "are",
+    "our",
+    "say",
+    "said",
+    "riunione",
+    "riunioni",
+    "meeting",
+    "meetings",
+    "deciso",
+    "decided",
+];
+
+/// La query FTS5 di una domanda: le parole che contano, come prefisso (così "decisione" trova "deciso"
+/// e "rilascio" trova "rilasciare"), in OR. Vuota se la domanda non ha parole utili.
+// ponytail: radice = parola meno 2 lettere; uno stemmer vero se le risposte perdono brani ovvi.
+pub fn ask_query(question: &str) -> String {
+    let mut terms: Vec<String> = vec![];
+    for w in question.split(|c: char| !c.is_alphanumeric()) {
+        let w = w.to_lowercase();
+        let plain: String = w.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+        if w.chars().count() < 3
+            || ASK_STOP.contains(&w.as_str())
+            || ASK_STOP.contains(&plain.as_str())
+        {
+            continue;
+        }
+        let n = w.chars().count();
+        let stem: String = if n > 5 {
+            w.chars().take(n - 2).collect()
+        } else {
+            w
+        };
+        let t = format!("\"{stem}\"*");
+        if !terms.contains(&t) {
+            terms.push(t);
+        }
+    }
+    terms.join(" OR ")
+}
+
 /// Parole che hanno l'aria di un nome proprio, una sigla o un termine tecnico: maiuscola non a
 /// inizio frase (Giorgio, Kubernetes), tutte maiuscole (ACME, API), maiuscole interne o cifre (iPhone, M1).
 // ponytail: euristica senza NLP; i falsi positivi si scartano con un clic dalla UI
@@ -611,7 +754,9 @@ impl Storage {
     }
 
     pub fn finish_meeting(&self, id: i64, lines: &str, error: Option<&str>) -> Result<()> {
-        self.conn.lock().unwrap().execute(
+        let mut conn = self.conn.lock().unwrap();
+        let tx = conn.transaction()?;
+        tx.execute(
             "UPDATE meetings SET lines = ?2, status = ?3, error = ?4 WHERE id = ?1",
             params![
                 id,
@@ -620,6 +765,17 @@ impl Storage {
                 error
             ],
         )?;
+        // le righe entrano nella ricerca di "Chiedi"
+        tx.execute(
+            "DELETE FROM meeting_lines_fts WHERE meeting_id = ?1",
+            params![id],
+        )?;
+        tx.execute(
+            "INSERT INTO meeting_lines_fts(text, meeting_id, line)
+             SELECT json_extract(j.value, '$.text'), ?1, j.key FROM json_each(?2) j",
+            params![id, lines],
+        )?;
+        tx.commit()?;
         Ok(())
     }
 
@@ -694,6 +850,10 @@ impl Storage {
             })
             .ok();
         conn.execute("DELETE FROM meetings WHERE id = ?1", params![id])?;
+        conn.execute(
+            "DELETE FROM meeting_lines_fts WHERE meeting_id = ?1",
+            params![id],
+        )?;
         Ok(dir)
     }
 
@@ -704,6 +864,131 @@ impl Storage {
             [],
         )?;
         Ok(())
+    }
+
+    /// I brani di dettati e riunioni pertinenti a una domanda ("Chiedi"): prima quelli che contengono
+    /// le sue parole, poi, se sono pochi, i più recenti degli ultimi `recent_days` giorni.
+    /// Ogni riga di riunione arriva con la precedente e la successiva, per il contesto.
+    pub fn ask_sources(
+        &self,
+        question: &str,
+        limit: usize,
+        recent_days: i64,
+    ) -> Result<Vec<Source>> {
+        let conn = self.conn.lock().unwrap();
+        let fts = ask_query(question);
+        let mut out: Vec<Source> = vec![];
+        let mut cache: std::collections::HashMap<i64, (i64, String, Vec<serde_json::Value>)> =
+            Default::default();
+        let mut line_source = |mid: i64, line: usize| -> Option<Source> {
+            if let std::collections::hash_map::Entry::Vacant(slot) = cache.entry(mid) {
+                let row = conn
+                    .query_row(
+                        "SELECT started_at, title, lines FROM meetings WHERE id = ?1",
+                        params![mid],
+                        |r| {
+                            Ok((
+                                r.get::<_, i64>(0)?,
+                                r.get::<_, String>(1)?,
+                                r.get::<_, String>(2)?,
+                            ))
+                        },
+                    )
+                    .ok()?;
+                slot.insert((
+                    row.0,
+                    row.1,
+                    serde_json::from_str(&row.2).unwrap_or_default(),
+                ));
+            }
+            let (at, title, lines) = &cache[&mid];
+            let l = lines.get(line)?;
+            let ctx = |i: usize| {
+                lines.get(i).map(|x| {
+                    let who = if x["speaker"] == "me" { "Io" } else { "Altri" };
+                    format!("{who}: {}", x["text"].as_str().unwrap_or_default())
+                })
+            };
+            let text = [line.checked_sub(1).and_then(ctx), ctx(line), ctx(line + 1)]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join("\n");
+            Some(Source {
+                kind: "meeting",
+                id: mid,
+                title: title.clone(),
+                at: *at,
+                offset_ms: l["start_ms"].as_i64(),
+                text,
+            })
+        };
+        if !fts.is_empty() {
+            let hits: Vec<(i64, i64)> = conn
+                .prepare(
+                    "SELECT meeting_id, line FROM meeting_lines_fts WHERE meeting_lines_fts MATCH ?1
+                     ORDER BY bm25(meeting_lines_fts) LIMIT ?2",
+                )?
+                .query_map(params![fts, limit as i64], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<rusqlite::Result<_>>()?;
+            // una riga già coperta dal contesto di un brano vicino non diventa un brano a sé
+            let mut covered = std::collections::HashSet::new();
+            for (mid, line) in hits {
+                if covered.contains(&(mid, line)) {
+                    continue;
+                }
+                covered.extend([(mid, line - 1), (mid, line), (mid, line + 1)]);
+                out.extend(line_source(mid, line as usize));
+            }
+            let dictations: Vec<Source> = conn
+                .prepare(
+                    "SELECT d.id, d.created_at, d.final_text, COALESCE(d.target_app, '')
+                     FROM dictations_fts f JOIN dictations d ON d.id = f.rowid
+                     WHERE dictations_fts MATCH ?1 AND d.command IS NULL ORDER BY bm25(dictations_fts) LIMIT ?2",
+                )?
+                .query_map(params![fts, (limit / 2) as i64], |r| {
+                    Ok(Source { kind: "dictation", id: r.get(0)?, at: r.get(1)?, text: r.get(2)?, title: r.get(3)?, offset_ms: None })
+                })?
+                .collect::<rusqlite::Result<_>>()?;
+            out.extend(dictations);
+        }
+        // pochi risultati (o domande senza parole chiave): riassunti e righe delle riunioni recenti
+        if out.len() < limit / 3 {
+            let since = now_ms() - recent_days * 86_400_000;
+            let recent: Vec<(i64, i64, String, String, i64)> = conn
+                .prepare(
+                    "SELECT id, started_at, title, COALESCE(summary, ''), json_array_length(lines) FROM meetings
+                     WHERE started_at >= ?1 AND status = 'done' ORDER BY started_at DESC LIMIT 5",
+                )?
+                .query_map(params![since], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)))?
+                .collect::<rusqlite::Result<_>>()?;
+            for (mid, at, title, summary, n) in recent {
+                if !summary.is_empty() {
+                    out.push(Source {
+                        kind: "meeting",
+                        id: mid,
+                        title,
+                        at,
+                        offset_ms: None,
+                        text: summary,
+                    });
+                } else {
+                    // senza riassunto: alcune righe distribuite lungo la riunione
+                    let step = (n / 6).max(1) as usize;
+                    out.extend(
+                        (0..n as usize)
+                            .step_by(step)
+                            .take(6)
+                            .filter_map(|line| line_source(mid, line)),
+                    );
+                }
+            }
+        }
+        // righe vicine si sovrappongono: ogni brano una volta, al massimo `limit`
+        let mut seen = std::collections::HashSet::new();
+        out.retain(|s| seen.insert((s.kind, s.id, s.offset_ms)));
+        out.truncate(limit);
+        Ok(out)
     }
 
     /// Vocabolario, snippet e modalità create dall'utente, da salvare in un file.
@@ -1325,6 +1610,87 @@ mod tests {
         assert_eq!(s.meetings().unwrap().first().unwrap().id, other);
         assert_eq!(s.delete_meeting(id).unwrap().as_deref(), Some("/tmp/m1"));
         assert!(s.meeting(id).unwrap().is_none());
+    }
+
+    #[test]
+    fn ask_query_keeps_the_words_that_matter() {
+        assert_eq!(
+            ask_query("Cosa abbiamo deciso sul rilascio?"),
+            "\"rilasc\"*"
+        );
+        assert_eq!(
+            ask_query("Chi prepara le note di rilascio?"),
+            "\"prepa\"* OR \"note\"* OR \"rilasc\"*"
+        );
+        assert_eq!(ask_query("cosa devo fare questa settimana?"), "");
+    }
+
+    #[test]
+    fn ask_finds_meeting_lines_with_context_and_dictations() {
+        let s = Storage::in_memory().unwrap();
+        let id = s
+            .insert_meeting(now_ms(), 60_000, "/tmp/m", "Punto rilascio", &[])
+            .unwrap();
+        s.finish_meeting(
+            id,
+            r#"[{"speaker":"others","start_ms":0,"end_ms":3000,"text":"Buongiorno, iniziamo."},
+                {"speaker":"me","start_ms":3000,"end_ms":6000,"text":"Il rilascio slitta a venerdì."},
+                {"speaker":"others","start_ms":6000,"end_ms":9000,"text":"Va bene, Giorgio prepara le note."}]"#,
+            None,
+        )
+        .unwrap();
+        s.insert_dictation(&Dictation {
+            raw_text: "ricordami il rilascio".into(),
+            final_text: "Ricordami di controllare il rilascio.".into(),
+            status: "ok",
+            ..Default::default()
+        })
+        .unwrap();
+        let found = s.ask_sources("Quando esce il rilascio?", 10, 7).unwrap();
+        let m = found.iter().find(|x| x.kind == "meeting").unwrap();
+        assert_eq!(
+            (m.id, m.title.as_str(), m.offset_ms),
+            (id, "Punto rilascio", Some(3000))
+        );
+        assert!(
+            m.text.contains("Altri: Buongiorno")
+                && m.text.contains("Io: Il rilascio")
+                && m.text.contains("Giorgio")
+        );
+        assert!(found.iter().any(|x| x.kind == "dictation"));
+        // senza parole chiave: le riunioni recenti
+        assert!(!s
+            .ask_sources("cosa devo fare questa settimana?", 10, 7)
+            .unwrap()
+            .is_empty());
+        // eliminata la riunione, non si trova più
+        s.delete_meeting(id).unwrap();
+        assert!(s
+            .ask_sources("rilascio", 10, 7)
+            .unwrap()
+            .iter()
+            .all(|x| x.kind != "meeting"));
+    }
+
+    /// Su un database vero (una copia): `VOXLOCAL_DB=… VOXLOCAL_Q=… cargo test --lib ask_on_real_db -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn ask_on_real_db() {
+        let (Ok(db), Ok(q)) = (std::env::var("VOXLOCAL_DB"), std::env::var("VOXLOCAL_Q")) else {
+            return;
+        };
+        let s = Storage::open(std::path::Path::new(&db)).unwrap();
+        println!("query: {}", ask_query(&q));
+        for (i, x) in s.ask_sources(&q, 24, 7).unwrap().iter().enumerate() {
+            println!(
+                "[{}] {} {} {:?}\n{}\n",
+                i + 1,
+                x.kind,
+                x.title,
+                x.offset_ms,
+                x.text
+            );
+        }
     }
 
     #[test]

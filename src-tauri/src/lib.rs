@@ -115,6 +115,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::meeting_start,
             commands::prompt_close,
+            commands::ask,
+            commands::ask_target,
             commands::calendar_access,
             commands::open_section,
             commands::meeting_stop,

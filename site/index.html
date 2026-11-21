@@ -130,6 +130,14 @@
   .has-light:hover::after { opacity: 1; }
   @media (prefers-reduced-motion: reduce) { .hero--centred .hero__window::before { animation: none; } }
 
+
+  /* the providers without script (a page opened from disk): the same names and marks, still */
+  .dg-fallback { display: grid; justify-items: center; gap: var(--s-6); }
+  .frame:has(.dg > :not(script)) .dg-fallback { display: none; }
+  .dg-fallback__core { padding: 10px 22px; border-radius: 999px; background: #fff; color: #232323; font-weight: 500; }
+  .dg-fallback ul { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 460px; margin: 0; padding: 0; list-style: none; }
+  .dg-fallback li { display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgb(255 255 255 / .16); background: rgb(255 255 255 / .06); color: #fff; font-size: 15px; }
+
   /* app-frame (sections-library.md, app-frame) */
   .app.ui { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); margin-top: var(--s-7); background: var(--u-bg); border: 1px solid var(--u-border); border-radius: var(--u-r); box-shadow: var(--u-shadow); }
   .app > .app__pane { position: relative; min-width: 0; min-height: 0; overflow: hidden; }
@@ -420,6 +428,7 @@
         </div>
         <div class="frame frame--split frame--fill span-6 start-7">
           <div class="dg" data-diagram><script type="application/json">{"layout": "hub", "alt": "VoxLocal riscrive il testo con Ollama sul computer oppure con OpenAI, Anthropic, Gemini, Groq, Mistral o DeepSeek.", "center": {"label": "VoxLocal", "icon": "ui:mic"}, "spokes": [{"label": "Ollama", "icon": "ollama"}, {"label": "OpenAI", "icon": "openai"}, {"label": "Anthropic", "icon": "anthropic"}, {"label": "Gemini", "icon": "gemini"}, {"label": "Groq", "icon": "groq"}, {"label": "Mistral", "icon": "mistral"}, {"label": "DeepSeek", "icon": "deepseek"}]}</script></div>
+          <div class="dg-fallback" aria-hidden="true"><span class="dg-fallback__core">VoxLocal</span><ul><li><img src="assets/icons/ollama.svg" alt="" width="20" height="20" loading="lazy">Ollama</li><li><img src="assets/icons/openai.svg" alt="" width="20" height="20" loading="lazy">OpenAI</li><li><img src="assets/icons/anthropic.svg" alt="" width="20" height="20" loading="lazy">Anthropic</li><li><img src="assets/icons/gemini.svg" alt="" width="20" height="20" loading="lazy">Gemini</li><li><img src="assets/icons/groq.svg" alt="" width="20" height="20" loading="lazy">Groq</li><li><img src="assets/icons/mistral.svg" alt="" width="20" height="20" loading="lazy">Mistral</li><li><img src="assets/icons/deepseek.svg" alt="" width="20" height="20" loading="lazy">DeepSeek</li></ul></div>
         </div>
       </div>
     </div>

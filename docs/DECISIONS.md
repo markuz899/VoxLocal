@@ -215,6 +215,19 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
   - niente NLP: i falsi positivi si scartano dalla UI e restano in `vocab_dismissed`;
   - dalla Cronologia la parola selezionata si aggiunge direttamente.
 
+## D47 — Trascrizione di file: symphonia, solo modello locale
+- **Decodifica:** `symphonia` (puro Rust, funziona uguale su macOS e Windows), con mp3, aac/m4a, mp4/mov, mkv, wav, flac, ogg vorbis, caf, aiff. Il video viene ridotto alla traccia audio, mixata in mono.
+- **Escluso:** Opus (i vocali WhatsApp), che symphonia non decodifica. Il file viene rifiutato con un messaggio chiaro; per supportarlo servirebbe libopus.
+- **Trascrizione:** sempre con il modello locale, anche se per i dettati è scelto il cloud, perché le API cloud hanno limiti di dimensione (25 MB su OpenAI). `transcribe_segments` restituisce segmenti con l'orario e riporta l'avanzamento con la callback di whisper-rs (la versione `_safe` di questa callback è corretta, a differenza di quella dell'interruzione).
+- **Misura:** 177 s di audio in 30 s su M1 con turbo q5 (circa 10 minuti per un'ora). La stessa funzione servirà alle note delle riunioni.
+- **Stato:** vive in un piccolo store fuori dal componente, così cambiando scheda non si perde. Il risultato non viene salvato nella cronologia: si copia o si salva come .txt, e le statistiche dei dettati restano pulite.
+- **Riassunto:** l'LLM predefinito con un prompt fisso (riassunto, punti chiave, decisioni e cose da fare) e un timeout di almeno 120 s.
+
+## D48 — Backup in un file JSON
+- **Contenuto:** vocabolario, snippet, modalità personali (`custom_*`) e regole per app. Mai le chiavi API né le modalità predefinite.
+- **Importazione:** unisce invece di sostituire. Le modalità con lo stesso slug vengono aggiornate, e un file che prova a riscrivere una modalità predefinita viene ignorato su quella (c'è un test). Le regole per app del file vincono su quelle con lo stesso nome di app.
+- **Finestre di dialogo:** aperte dal backend (`tauri-plugin-dialog` da Rust), così il webview non riceve permessi sul file system.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

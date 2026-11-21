@@ -143,6 +143,15 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] **Voce sussurrata** a 30 cm dal microfono: la trascrizione è corretta e nel log compare "voce bassa: guadagno ×…". Il silenzio puro continua a essere scartato.
 - [ ] **Vocabolario:** i suggerimenti compaiono dopo che un nome torna in almeno due dettati; "×" lo nasconde per sempre, "+" lo aggiunge. Dalla Cronologia, selezionando una parola, "Add the selection to the vocabulary" la aggiunge.
 
+## Trascrizione di file e backup
+
+- [ ] **Trascrivi un file:** trascina un m4a o un mp4 di qualche minuto. L'avanzamento sale fino a 100% e il testo esce con gli orari. Cambiando scheda e tornando, l'avanzamento o il risultato sono ancora lì.
+- [ ] **Annulla** durante la trascrizione: compare "Trascrizione annullata" e se ne può avviare subito un'altra.
+- [ ] **Azioni sul risultato:** "Copia" e "Salva come testo" funzionano, con o senza orari. "Riassumi" con un provider LLM configurato dà riassunto, punti chiave e cose da fare; senza provider compare un messaggio che spiega cosa configurare.
+- [ ] **File .opus** (vocale WhatsApp): viene rifiutato con un messaggio chiaro.
+- [ ] **Backup:** "Esporta" in Generale crea un JSON. "Importa" su un profilo pulito ripristina vocabolario, snippet, modalità e regole per app; reimportare non crea doppioni.
+- [ ] **Test lungo automatico:** `VOXLOCAL_LONG_FILE=… VOXLOCAL_MODEL=… cargo test --release --lib long_file -- --ignored --nocapture`.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

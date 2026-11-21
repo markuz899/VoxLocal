@@ -23,7 +23,8 @@ scorciatoia ─► microfono ─► 16 kHz ─► whisper.cpp ─► [LLM opzion
    - Il dettato in corso compare dal vivo in cima all'elenco.
 7. **Comando sulla selezione.** Selezioni un testo in qualsiasi app, tieni premuto ⌥⇧Space e dici cosa farne ("rendilo più formale", "traducilo in tedesco"): VoxLocal lo sostituisce con il risultato dell'LLM.
 8. **Snippet, statistiche, vocabolario che impara.** Frasi brevi che incollano testi salvati; parole dettate, velocità e tempo risparmiato; suggerimenti di nomi e sigle ricorrenti. Le correzioni a voce ("alle 3, anzi alle 4") e i comandi di formattazione ("a capo", "punto elenco") vengono applicati, e la voce bassa viene amplificata prima della trascrizione.
-9. **Modalità per app.** Le regole del tipo "Slack usa Messaggio" o "Mail usa Email" scelgono la modalità in base all'app in primo piano quando parte il dettato.
+9. **Trascrizione di file e backup.** Si trascina un file audio o video (riunione, lezione, intervista): viene trascritto sul computer con gli orari, e si può salvare o riassumere con le cose da fare. Vocabolario, snippet e modalità si esportano in un file e si importano su un altro computer.
+10. **Modalità per app.** Le regole del tipo "Slack usa Messaggio" o "Mail usa Email" scelgono la modalità in base all'app in primo piano quando parte il dettato.
 
 ### Provider LLM
 

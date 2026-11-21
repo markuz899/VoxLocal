@@ -773,6 +773,15 @@ export const MODE_LIBRARY: LibraryMode[] = [
     task: "Rewrite the dictation in a friendly, casual tone, like a message to a colleague. Keep the content and the original language.",
   },
   {
+    id: "self_corrections",
+    name: { en: "Spoken corrections", it: "Correzioni a voce" },
+    description: {
+      en: "Keeps your words, applies “no, I mean…” corrections and “new line”.",
+      it: "Tiene le tue parole, applica gli “anzi” e i “a capo”.",
+    },
+    task: 'Keep the dictation exactly as said, except: when the speaker corrects themselves ("at 3, no, at 4", "I mean", "anzi", "volevo dire") keep only the corrected version and drop the correction words; apply spoken formatting commands ("new line", "new paragraph", "bullet point", "a capo", "punto elenco") instead of writing them; fix punctuation and capitals. Do not rephrase anything else. Keep the original language.',
+  },
+  {
     id: "grammar",
     name: { en: "Grammar fix only", it: "Solo correzione grammaticale" },
     description: {

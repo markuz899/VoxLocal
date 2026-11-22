@@ -212,6 +212,12 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] Una regola "Slack usa Elenco puntato" vince sullo stile automatico.
 - [ ] Interruttore spento in Modalità: Slack torna a Pulito.
 
+## Esitazioni tolte senza LLM
+
+- [ ] Modalità Grezzo, detta "ehm allora ci vediamo, ehm, domani": esce "Allora ci vediamo domani" (o simile, senza ehm).
+- [ ] "piano piano" e "eh sì" restano come detti.
+- [ ] In cronologia l'originale mostra ancora gli "ehm".
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

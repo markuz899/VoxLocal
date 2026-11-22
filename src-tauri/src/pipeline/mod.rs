@@ -449,10 +449,15 @@ impl Pipeline {
             return self.run_command(sel, d, &settings, cancel, released).await;
         }
 
+        // Via "ehm" e parole ripetute senza LLM; in cronologia resta l'originale (raw_text).
+        let spoken = crate::fillers::clean(&transcript.text);
+        if spoken.is_empty() {
+            return Ok(());
+        }
         let mut d = Dictation {
             language: transcript.language.clone(),
             raw_text: transcript.text.clone(),
-            final_text: transcript.text.clone(),
+            final_text: spoken.clone(),
             stt_model: (stt_id == "local").then(|| settings.local_model.clone()),
             stt_provider: stt_id,
             status: "ok",
@@ -464,7 +469,7 @@ impl Pipeline {
         };
         // Snippet: se il dettato è esattamente una frase salvata, si incolla il suo testo e basta;
         // se la frase compare dentro il dettato, viene sostituita prima dell'LLM (che la riceve già scritta).
-        let snippet = self.storage.snippet_for(&transcript.text).ok().flatten();
+        let snippet = self.storage.snippet_for(&spoken).ok().flatten();
         let input = match &snippet {
             Some(text) => {
                 log::info!("snippet: {} caratteri", text.chars().count());
@@ -472,11 +477,11 @@ impl Pipeline {
             }
             None => self
                 .storage
-                .expand_snippets(&transcript.text)
+                .expand_snippets(&spoken)
                 .ok()
                 .flatten()
                 .inspect(|_| log::info!("snippet sostituito dentro il dettato"))
-                .unwrap_or_else(|| transcript.text.clone()),
+                .unwrap_or_else(|| spoken.clone()),
         };
         d.final_text = input.clone();
         // Una regola "app → modalità" (poi lo stile automatico) vince sulla modalità del menu. Uno snippet salta le modalità.

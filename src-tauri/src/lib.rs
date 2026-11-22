@@ -2,6 +2,7 @@ pub mod audio;
 pub mod cli;
 mod commands;
 mod context;
+mod fillers;
 mod i18n;
 pub mod llm;
 pub mod meeting;

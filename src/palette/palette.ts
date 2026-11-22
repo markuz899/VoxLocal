@@ -74,9 +74,20 @@ function render() {
     }),
   );
   $("group").hidden = shown.length === 0;
-  // la finestra segue la scheda: niente spazio vuoto sotto la lista
-  const height = document.querySelector(".card")?.scrollHeight ?? 0;
-  if (height) invoke("palette_resize", { height });
+  // La finestra segue la scheda: niente spazio vuoto sotto la lista. Si somma l'altezza naturale
+  // di ogni parte (bordi e righe nascoste compresi): scrollHeight della scheda dipende dalla
+  // finestra e perdeva i bordi a ogni nuovo render, quindi la barra si accorciava.
+  const card = document.querySelector<HTMLElement>(".card");
+  if (!card) return;
+  const parts = [...card.children] as HTMLElement[];
+  const height =
+    parts.reduce(
+      (h, el) => h + el.offsetHeight + el.scrollHeight - el.clientHeight,
+      0,
+    ) +
+    card.offsetHeight -
+    card.clientHeight;
+  invoke("palette_resize", { height });
 }
 
 field.addEventListener("input", () => {

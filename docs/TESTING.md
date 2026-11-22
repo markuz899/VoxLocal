@@ -183,11 +183,11 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 
 ## Comando scritto nella barra
 
-- [ ] **Tocco:** seleziona un testo in Note, tocca ⌥⇧ Spazio senza parlare: si apre la barra con il numero di parole.
+- [ ] **Apertura:** seleziona un testo in Note, premi ⌥⇧ Spazio (in toggle e in push-to-talk): si apre la barra con il numero di parole e il pulsante Parla.
 - [ ] **Scritto:** scrivi "traduci in inglese" e premi Invio: la selezione in Note viene sostituita.
 - [ ] **Recente:** riapri la barra: il comando appena usato è in cima; frecce più Invio lo applicano.
 - [ ] **Esc e clic fuori:** la barra si chiude, la selezione resta, gli appunti tornano quelli di prima.
-- [ ] **Voce:** tenendo premuto e parlando il comando funziona come prima, senza barra.
+- [ ] **Voce:** con la barra aperta premi Parla (o di nuovo ⌥⇧ Spazio), di' "rendilo più formale" e chiudi la registrazione: la selezione in Note viene sostituita.
 - [ ] **Senza selezione:** un tocco senza testo selezionato mostra l'avviso, nessuna barra.
 
 ## Cose da fare dalla riunione

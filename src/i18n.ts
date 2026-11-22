@@ -43,7 +43,7 @@ const en = {
   "general.shortcutHint": "Works in any app. Esc cancels.",
   "general.commandShortcut": "Selection command shortcut",
   "general.commandShortcutHint":
-    "Select text, hold it and say what to do: “make it more formal”.",
+    "Select text and press it: pick a command, type one or click Speak and say it.",
   "general.activation": "How it starts",
   "general.ptt": "Hold to talk",
   "general.toggle": "Press to start and stop",
@@ -462,7 +462,7 @@ const it: Record<Key, string> = {
   "general.shortcutHint": "Funziona in qualsiasi app. Esc annulla.",
   "general.commandShortcut": "Scorciatoia del comando sulla selezione",
   "general.commandShortcutHint":
-    "Selezioni un testo, la tieni premuta e dici cosa farne: “rendilo più formale”.",
+    "Selezioni un testo e la premi: scegli un comando, lo scrivi o premi Parla e lo dici.",
   "general.activation": "Come si attiva",
   "general.ptt": "Tieni premuto per parlare",
   "general.toggle": "Premi per avviare e fermare",
@@ -1006,7 +1006,7 @@ export const FAQ: Record<
       ],
       [
         "What is the selection command?",
-        "Select some text in any app, hold ⌥⇧ Space (Alt+Shift+Space) and say what to do with it: “make it more formal”, “translate into German”, “turn it into a list”. Tap the shortcut instead of holding it to type the command, or pick a recent one. VoxLocal replaces the selection with the result. Starting with “reply…” (“reply that Thursday is fine”) it writes an answer to the selected message instead and copies it, ready to paste. It needs an LLM provider.",
+        "Select some text in any app, press ⌥⇧ Space (Alt+Shift+Space) and the command bar opens: pick a recent command, type one, or click Speak and say what to do: “make it more formal”, “translate into German”, “turn it into a list”. VoxLocal replaces the selection with the result. Starting with “reply…” (“reply that Thursday is fine”) it writes an answer to the selected message instead and copies it, ready to paste. It needs an LLM provider.",
       ],
       [
         "What are modes?",
@@ -1096,7 +1096,7 @@ export const FAQ: Record<
       ],
       [
         "Cos'è il comando sulla selezione?",
-        "Selezioni un testo in qualsiasi app, tieni premuto ⌥⇧ Spazio (Alt+Shift+Spazio) e dici cosa farne: “rendilo più formale”, “traducilo in tedesco”, “fanne un elenco”. Se tocchi la scorciatoia invece di tenerla premuta puoi scrivere il comando, o sceglierne uno recente. VoxLocal sostituisce la selezione con il risultato. Se inizi con “rispondi…” (“rispondi che giovedì va bene”) scrive invece una risposta al messaggio selezionato e la copia, pronta da incollare. Serve un provider LLM.",
+        "Selezioni un testo in qualsiasi app, premi ⌥⇧ Spazio (Alt+Shift+Spazio) e si apre la barra: scegli un comando recente, lo scrivi o premi Parla e dici cosa farne: “rendilo più formale”, “traducilo in tedesco”, “fanne un elenco”. VoxLocal sostituisce la selezione con il risultato. Se inizi con “rispondi…” (“rispondi che giovedì va bene”) scrive invece una risposta al messaggio selezionato e la copia, pronta da incollare. Serve un provider LLM.",
       ],
       [
         "Cosa sono le modalità?",

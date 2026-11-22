@@ -597,6 +597,12 @@ pub fn palette_run(p: P, instruction: String) {
     p.palette_run(instruction);
 }
 
+/// Dalla barra si passa a dettare il comando.
+#[tauri::command]
+pub fn palette_speak(p: P) {
+    p.palette_speak();
+}
+
 /// Adatta l'altezza della barra ai comandi mostrati.
 #[tauri::command]
 pub fn palette_resize(app: AppHandle, height: f64) {

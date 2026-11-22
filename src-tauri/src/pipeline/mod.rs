@@ -176,7 +176,8 @@ impl Pipeline {
         let mode = self.settings.lock().unwrap().hotkey_mode;
         let state = self.inner.lock().unwrap().state;
         match (state, pressed, mode) {
-            (State::Idle, true, _) => self.start(trigger),
+            (State::Idle, true, _) if trigger == Trigger::Command => self.command_pressed(),
+            (State::Idle, true, _) => self.start(trigger, None),
             (State::Recording, false, HotkeyMode::Ptt) => self.finish(),
             (State::Recording, true, HotkeyMode::Toggle) => self.finish(),
             // ponytail: hotkey ignorata durante trascrizione/incolla; coda di 1 dettato se serve davvero
@@ -201,9 +202,51 @@ impl Pipeline {
         self.set_state(State::Idle);
     }
 
-    fn start(self: &Arc<Self>, trigger: Trigger) {
+    /// La scorciatoia del comando apre la barra; premuta di nuovo con la barra aperta, si parla.
+    fn command_pressed(self: &Arc<Self>) {
+        if self.inner.lock().unwrap().typed.is_some() {
+            return self.palette_speak();
+        }
+        // Prima di aprire la barra: la selezione si copia finché il focus è nell'app di destinazione.
+        let target_app = crate::context::frontmost_app();
+        let target_pid = crate::context::frontmost_pid();
+        let sel = tauri::async_runtime::spawn(copy_selection(self.app.clone()));
+        let me = self.clone();
+        tauri::async_runtime::spawn(async move {
+            me.open_palette(sel, target_app, target_pid).await;
+        });
+    }
+
+    /// Dalla barra (🎤 o di nuovo la scorciatoia): il comando si detta sulla selezione già copiata.
+    pub fn palette_speak(self: &Arc<Self>) {
+        let Some(t) = self.inner.lock().unwrap().typed.take() else {
+            return;
+        };
+        crate::palette::close(&self.app);
+        crate::context::activate(t.target_pid);
+        let (previous, selected) = (t.previous, t.selected);
+        let sel: Selection =
+            tauri::async_runtime::spawn(async move { Ok((previous, Some(selected))) });
+        self.start(Trigger::Command, Some((sel, t.target_app, t.target_pid)));
+    }
+
+    /// `preset`: selezione e app di destinazione già prese dalla barra dei comandi.
+    fn start(
+        self: &Arc<Self>,
+        trigger: Trigger,
+        preset: Option<(Selection, Option<String>, Option<i32>)>,
+    ) {
         // Una barra dei comandi rimasta aperta: un nuovo dettato la chiude.
         self.palette_cancel(false);
+        let (preset_sel, preset_target) = match preset {
+            Some((sel, app, pid)) => (Some(sel), Some((app, pid))),
+            None => (None, None),
+        };
+        let give_back = |sel: Option<Selection>| {
+            if let Some(sel) = sel {
+                tauri::async_runtime::spawn(restore_selection_clipboard(sel));
+            }
+        };
         let (model, stt_provider, lang) = {
             let s = self.settings.lock().unwrap();
             (
@@ -213,6 +256,7 @@ impl Pipeline {
             )
         };
         let Some(info) = models::find(&model) else {
+            give_back(preset_sel);
             return self.notify(&format!(
                 "{}: {model}",
                 tr(&lang, "Unknown model", "Modello sconosciuto")
@@ -226,12 +270,15 @@ impl Pipeline {
                 "The transcription model is not downloaded yet: downloading it now.",
                 "Il modello di trascrizione non è ancora scaricato: lo scarico ora.",
             ));
+            give_back(preset_sel);
             return self.ensure_model();
         }
 
         // Comando: copio subito la selezione, finché il focus è nell'app di destinazione.
-        let selection = (trigger == Trigger::Command)
-            .then(|| tauri::async_runtime::spawn(copy_selection(self.app.clone())));
+        let selection = preset_sel.or_else(|| {
+            (trigger == Trigger::Command)
+                .then(|| tauri::async_runtime::spawn(copy_selection(self.app.clone())))
+        });
 
         // Precarica il modello mentre l'utente parla: toglie il caricamento dalla latenza.
         if stt_provider == LOCAL_STT {
@@ -246,8 +293,12 @@ impl Pipeline {
         let app = self.app.clone();
         let device = self.settings.lock().unwrap().audio_device.clone();
         // Prima di aprire il microfono: dopo, su macOS, il focus resta comunque all'app di destinazione.
-        let target_app = crate::context::frontmost_app();
-        let target_pid = crate::context::frontmost_pid();
+        let (target_app, target_pid) = preset_target.unwrap_or_else(|| {
+            (
+                crate::context::frontmost_app(),
+                crate::context::frontmost_pid(),
+            )
+        });
         let rec = match Recorder::start(device.clone(), move |level| {
             let _ = app.emit("audio://level", level);
         }) {
@@ -701,8 +752,8 @@ impl Pipeline {
             }
             self.notify(tr(
                 &self.lang(),
-                "Select some text first, then use the command shortcut: hold it to speak, tap it to type.",
-                "Seleziona prima del testo, poi usa la scorciatoia del comando: tienila premuta per parlare, toccala per scrivere.",
+                "Select some text first, then press the command shortcut.",
+                "Seleziona prima del testo, poi premi la scorciatoia del comando.",
             ));
             return;
         };
@@ -727,6 +778,7 @@ impl Pipeline {
             .unwrap_or(0);
         PaletteData {
             words,
+            hotkey: self.settings.lock().unwrap().command_hotkey.clone(),
             recent: self.storage.recent_commands(5).unwrap_or_default(),
             lang: self.lang(),
         }
@@ -1744,6 +1796,7 @@ fn civil_date(ms: i64) -> (i64, u32, u32, usize) {
 #[derive(Clone, Serialize)]
 pub struct PaletteData {
     words: usize,
+    hotkey: String,
     recent: Vec<String>,
     lang: String,
 }

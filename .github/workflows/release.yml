@@ -7,7 +7,7 @@ name: Release
 on:
   push:
     branches: [main]
-    paths-ignore: [site/**, docs/**, "**.md", .github/workflows/pages.yml]
+    paths-ignore: [site/**, docs/**, "**.md", .github/**, scripts/bump-version.mjs]
   workflow_dispatch:
 
 permissions:
@@ -135,6 +135,7 @@ jobs:
   site:
     needs: publish
     permissions:
+      actions: read
       contents: read
       pages: write
       id-token: write

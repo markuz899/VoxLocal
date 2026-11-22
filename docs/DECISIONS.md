@@ -306,6 +306,13 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - In cronologia l'originale (`raw_text`) resta com'era. File e riunioni non passano di qui: lì serve la trascrizione fedele.
 - Prossimo passo valutato: un modello locale (llama-server + Qwen3 1.7B) per Pulito senza Ollama; rimandato.
 
+## D58 — Dettature lunghe trascritte a pezzi mentre si parla
+
+- Mentre si registra, ogni 500 ms `audio::next_cut` cerca dove tagliare l'audio non ancora trascritto: nell'ultima pausa di almeno 0,4 s dopo i primi 12 s (pausa = molto sotto il volume medio, niente soglia fissa) oppure, oltre i 30 s senza pause, nel punto più silenzioso degli ultimi 10 s. Il pezzo si trascrive subito; al rilascio resta solo la coda.
+- **Continuità:** dal secondo pezzo whisper riceve la lingua del primo e la fine del testo precedente come contesto (`initial_prompt`, dopo il vocabolario).
+- **Sicurezza:** se un pezzo fallisce, al rilascio si trascrive tutto l'audio come prima. I pezzi silenziosi si saltano. Vale anche con lo STT in cloud.
+- **Misura** (`examples/chunked.rs`, M1 8 GB, large-v3-turbo, 146 s di parlato): attesa dopo il rilascio da 13,0 s a 2,7 s. La trascrizione intera aveva perso due paragrafi, quella a pezzi no.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

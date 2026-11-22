@@ -128,6 +128,26 @@ struct Inner {
     target_pid: Option<i32>,
     /// La selezione in attesa del comando scritto nella barra (palette.rs).
     typed: Option<Typed>,
+    /// La trascrizione a pezzi del dettato in corso.
+    chunker: Option<Chunker>,
+}
+
+/// Dettature lunghe: i pezzi già finiti (tagliati nelle pause, `audio::next_cut`) si trascrivono
+/// mentre si parla, così al rilascio resta solo l'ultimo.
+struct Chunker {
+    stop: CancellationToken,
+    handle: tauri::async_runtime::JoinHandle<Chunks>,
+}
+
+#[derive(Default)]
+struct Chunks {
+    /// Campioni (frequenza del microfono) già trascritti.
+    committed: usize,
+    texts: Vec<String>,
+    language: Option<String>,
+    stt_id: String,
+    /// Un pezzo è fallito: al rilascio si trascrive tutto come prima.
+    failed: bool,
 }
 
 /// Un comando aperto nella barra: la selezione già copiata e dove rimetterla.
@@ -156,6 +176,7 @@ impl Pipeline {
                 selection: None,
                 target_pid: None,
                 typed: None,
+                chunker: None,
             }),
             downloading: AtomicBool::new(false),
             mic_test: Mutex::new(None),
@@ -190,6 +211,7 @@ impl Pipeline {
         let (rec, selection) = {
             let mut inner = self.inner.lock().unwrap();
             inner.cancel.cancel();
+            inner.chunker = None;
             (inner.recorder.take(), inner.selection.take())
         };
         if let Some(rec) = rec {
@@ -318,6 +340,7 @@ impl Pipeline {
             }
         };
 
+        let tap = rec.tap();
         let (generation, max) = {
             let mut inner = self.inner.lock().unwrap();
             inner.recorder = Some(rec);
@@ -330,6 +353,9 @@ impl Pipeline {
             (inner.generation, self.settings.lock().unwrap().max_seconds)
         };
         self.set_state(State::Recording);
+        let cancel = self.inner.lock().unwrap().cancel.clone();
+        let chunker = self.spawn_chunker(tap, cancel);
+        self.inner.lock().unwrap().chunker = Some(chunker);
 
         let me = self.clone();
         tauri::async_runtime::spawn(async move {
@@ -351,11 +377,12 @@ impl Pipeline {
 
     fn finish(self: &Arc<Self>) {
         let released = Instant::now();
-        let (rec, cancel, target, mut selection, pid) = {
+        let (rec, chunker, cancel, target, mut selection, pid) = {
             let mut inner = self.inner.lock().unwrap();
             let target = (inner.target_app.clone(), inner.audio_device.clone());
             (
                 inner.recorder.take(),
+                inner.chunker.take(),
                 inner.cancel.clone(),
                 target,
                 inner.selection.take(),
@@ -367,7 +394,9 @@ impl Pipeline {
         let me = self.clone();
         let target_app = target.0.clone();
         tauri::async_runtime::spawn(async move {
-            let res = me.run(rec, &cancel, released, target, &mut selection).await;
+            let res = me
+                .run(rec, chunker, &cancel, released, target, &mut selection)
+                .await;
             if let Err(e) = &res {
                 if !cancel.is_cancelled() {
                     log::error!("dettato fallito: {e:#}");
@@ -392,15 +421,26 @@ impl Pipeline {
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn run(
         &self,
         rec: Recorder,
+        chunker: Option<Chunker>,
         cancel: &CancellationToken,
         released: Instant,
         (target_app, audio_device): (Option<String>, Option<String>),
         selection: &mut Option<Selection>,
     ) -> Result<()> {
+        // prima si fermano i pezzi, poi il microfono; quello in corso finisce e conta
+        if let Some(c) = &chunker {
+            c.stop.cancel();
+        }
         let raw = tokio::task::spawn_blocking(move || rec.stop()).await??;
+        let parts = match chunker {
+            Some(c) => c.handle.await.ok(),
+            None => None,
+        }
+        .filter(|p| !p.failed && p.committed > 0);
         let audio_ms = raw.duration_ms();
         if audio_ms < MIN_AUDIO_MS || raw.rms() < SILENCE_RMS || raw.peak() < SILENCE_PEAK {
             log::info!(
@@ -411,23 +451,51 @@ impl Pipeline {
             return Ok(());
         }
 
-        let t = Instant::now();
-        let mut audio = audio::to_16k(raw)?;
-        let gain = audio.boost_quiet();
-        if gain > 1.0 {
-            log::info!("voce bassa: guadagno ×{gain:.1}");
-        }
-        let resample_ms = t.elapsed().as_millis();
-
         let settings = self.settings();
         let vocabulary = self.storage.vocabulary().unwrap_or_default();
-        let opts = SttOptions {
-            language: settings.language(),
-            initial_prompt: (!vocabulary.is_empty()).then(|| vocabulary.join(", ")),
-            cancel: cancel.clone(),
-        };
         let t = Instant::now();
-        let (transcript, stt_id) = self.transcribe(&audio, &opts, &settings).await?;
+        let mut resample_ms = 0;
+        let (transcript, stt_id) = match parts {
+            // a pezzi: resta solo la coda dopo l'ultimo taglio
+            Some(mut p) => {
+                let mut tail = raw;
+                tail.samples.drain(..p.committed.min(tail.samples.len()));
+                let n = p.texts.len();
+                if tail.duration_ms() >= MIN_AUDIO_MS
+                    && tail.rms() >= SILENCE_RMS
+                    && tail.peak() >= SILENCE_PEAK
+                {
+                    let (last, id) = self
+                        .transcribe_part(tail, &p, &settings, &vocabulary, cancel)
+                        .await?;
+                    p.texts.push(last.text.trim().to_string());
+                    p.stt_id = id;
+                }
+                log::info!("dettato a pezzi: {n} pezzi trascritti prima del rilascio");
+                let text = p.texts.join(" ").trim().to_string();
+                (
+                    Transcript {
+                        text,
+                        language: p.language,
+                    },
+                    p.stt_id,
+                )
+            }
+            None => {
+                let mut audio = audio::to_16k(raw)?;
+                let gain = audio.boost_quiet();
+                if gain > 1.0 {
+                    log::info!("voce bassa: guadagno ×{gain:.1}");
+                }
+                resample_ms = t.elapsed().as_millis();
+                let opts = SttOptions {
+                    language: settings.language(),
+                    initial_prompt: (!vocabulary.is_empty()).then(|| vocabulary.join(", ")),
+                    cancel: cancel.clone(),
+                };
+                self.transcribe(&audio, &opts, &settings).await?
+            }
+        };
         let stt_ms = t.elapsed().as_millis() as u64;
         if cancel.is_cancelled() || transcript.text.is_empty() {
             return Ok(());
@@ -856,6 +924,88 @@ impl Pipeline {
     }
 
     /// STT remoto se configurato, con ripiego su whisper locale se fallisce.
+    fn spawn_chunker(self: &Arc<Self>, tap: audio::Tap, cancel: CancellationToken) -> Chunker {
+        let stop = CancellationToken::new();
+        let stopped = stop.clone();
+        let me = self.clone();
+        let handle = tauri::async_runtime::spawn(async move {
+            let mut st = Chunks::default();
+            let settings = me.settings();
+            let vocabulary = me.storage.vocabulary().unwrap_or_default();
+            loop {
+                tokio::select! {
+                    _ = stopped.cancelled() => break,
+                    _ = cancel.cancelled() => break,
+                    _ = tokio::time::sleep(Duration::from_millis(500)) => {}
+                }
+                // ponytail: copia l'audio in sospeso a ogni giro (al massimo ~30 s), basta così
+                let mut samples = tap.from(st.committed);
+                let Some(cut) = audio::next_cut(&samples, tap.rate) else {
+                    continue;
+                };
+                st.committed += cut;
+                samples.truncate(cut);
+                let part = AudioBuffer {
+                    samples,
+                    sample_rate: tap.rate,
+                };
+                if part.rms() < SILENCE_RMS || part.peak() < SILENCE_PEAK {
+                    continue;
+                }
+                let secs = part.duration_ms() / 1000;
+                match me
+                    .transcribe_part(part, &st, &settings, &vocabulary, &cancel)
+                    .await
+                {
+                    Ok((t, id)) => {
+                        log::info!("pezzo di {secs} s trascritto durante il dettato");
+                        if st.language.is_none() {
+                            st.language = t.language;
+                        }
+                        st.texts.push(t.text.trim().to_string());
+                        st.stt_id = id;
+                    }
+                    Err(e) => {
+                        if !cancel.is_cancelled() {
+                            log::warn!("pezzo non trascritto, al rilascio si rifà tutto: {e:#}");
+                        }
+                        st.failed = true;
+                        break;
+                    }
+                }
+            }
+            st
+        });
+        Chunker { stop, handle }
+    }
+
+    /// Un pezzo di dettato: lingua del primo pezzo e fine del pezzo prima come contesto per whisper.
+    async fn transcribe_part(
+        &self,
+        part: AudioBuffer,
+        st: &Chunks,
+        settings: &Settings,
+        vocabulary: &[String],
+        cancel: &CancellationToken,
+    ) -> Result<(Transcript, String)> {
+        let mut audio = audio::to_16k(part)?;
+        audio.boost_quiet();
+        let mut prompt = vocabulary.join(", ");
+        if let Some(last) = st.texts.last() {
+            let start = last.char_indices().rev().nth(199).map_or(0, |(i, _)| i);
+            if !prompt.is_empty() {
+                prompt.push_str(". ");
+            }
+            prompt.push_str(&last[start..]);
+        }
+        let opts = SttOptions {
+            language: settings.language().or_else(|| st.language.clone()),
+            initial_prompt: (!prompt.is_empty()).then_some(prompt),
+            cancel: cancel.clone(),
+        };
+        self.transcribe(&audio, &opts, settings).await
+    }
+
     async fn transcribe(
         &self,
         audio: &AudioBuffer,

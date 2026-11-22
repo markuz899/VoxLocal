@@ -1,17 +1,51 @@
 name: Release
 
-# Si avvia con un tag: git tag v0.2.0 && git push origin v0.2.0
-# Crea una release in bozza con installer e latest.json; si pubblica a mano dopo i test.
+# Ogni merge su main che tocca l'app esce come nuova versione: se la versione in package.json ha
+# già un tag, sale la patch (0.2.0 → 0.2.1) con un commit del bot; poi tag, installer per i tre
+# sistemi, release pubblicata e sito aggiornato. Per un salto minore o maggiore basta mettere
+# a mano la nuova versione in package.json e Cargo.toml prima del merge.
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+    paths-ignore: [site/**, docs/**, "**.md", .github/workflows/pages.yml]
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# una release alla volta, mai annullata a metà
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: bump
+        run: |
+          cur=$(node -p "require('./package.json').version")
+          next=$cur
+          if git rev-parse -q --verify "refs/tags/v$cur" >/dev/null; then
+            IFS=. read -r major minor patch <<<"$cur"
+            next="$major.$minor.$((patch + 1))"
+            node scripts/bump-version.mjs "$next"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -am "chore: release v$next"
+            git push origin HEAD:main
+          fi
+          git tag "v$next"
+          git push origin "v$next"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -27,6 +61,8 @@ jobs:
       HAS_APPLE_SIGNING: ${{ secrets.APPLE_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: v${{ needs.version.outputs.version }}
 
       # L'updater legge latest.json dalle release di questo stesso repository.
       - name: Endpoint dell'updater
@@ -83,3 +119,23 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+  # La release resta in bozza finché tutti e tre i sistemi non hanno caricato i file.
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh release edit "v${{ needs.version.outputs.version }}" --repo "$GITHUB_REPOSITORY"
+          --draft=false --latest
+
+  # Una release pubblicata dal bot non avvia altri workflow: il sito si aggiorna da qui.
+  site:
+    needs: publish
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    uses: ./.github/workflows/pages.yml

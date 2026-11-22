@@ -544,7 +544,7 @@ pub fn get_meeting(p: P, id: i64) -> R<Option<crate::storage::Meeting>> {
 }
 
 #[tauri::command]
-pub async fn summarize_meeting(p: P<'_>, id: i64) -> R<String> {
+pub async fn summarize_meeting(p: P<'_>, id: i64) -> R<crate::pipeline::MeetingSummary> {
     p.summarize_meeting(id).await.map_err(|e| format!("{e:#}"))
 }
 
@@ -568,6 +568,21 @@ pub fn screen_permission(request: bool) -> bool {
 #[tauri::command]
 pub fn prompt_close(app: AppHandle) {
     crate::meeting_watch::close(&app);
+}
+
+/// Salva le cose da fare di una riunione dopo una modifica.
+#[tauri::command]
+pub fn save_meeting_actions(p: P, id: i64, actions: Vec<crate::storage::Action>) -> R<()> {
+    p.save_meeting_actions(id, &actions)
+        .map_err(|e| format!("{e:#}"))
+}
+
+/// Manda in Promemoria le cose da fare ancora aperte.
+#[tauri::command]
+pub async fn add_meeting_reminders(p: P<'_>, id: i64) -> R<usize> {
+    p.add_meeting_reminders(id)
+        .await
+        .map_err(|e| format!("{e:#}"))
 }
 
 /// La barra dei comandi: parole selezionate e comandi recenti.

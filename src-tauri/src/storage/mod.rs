@@ -5,7 +5,7 @@ use std::sync::Mutex;
 
 use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 const MIGRATIONS: &[&str] = &[
     r#"
@@ -96,6 +96,9 @@ CREATE VIRTUAL TABLE meeting_lines_fts USING fts5(
 );
 INSERT INTO meeting_lines_fts(text, meeting_id, line)
   SELECT json_extract(j.value, '$.text'), m.id, j.key FROM meetings m, json_each(m.lines) j;
+"#,
+    r#"
+ALTER TABLE meetings ADD COLUMN actions TEXT NOT NULL DEFAULT '[]';
 "#,
 ];
 
@@ -246,6 +249,23 @@ pub struct Meeting {
     pub lines: serde_json::Value,
     pub summary: Option<String>,
     pub attendees: Vec<String>,
+    pub actions: Vec<Action>,
+}
+
+/// Una cosa da fare uscita da una riunione.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct Action {
+    #[serde(default)]
+    pub who: String,
+    pub what: String,
+    /// Come è stata detta la scadenza ("entro giovedì"), vuota se non c'è.
+    #[serde(default)]
+    pub due: String,
+    /// La stessa scadenza come data, AAAA-MM-GG, se si può ricavare.
+    #[serde(default)]
+    pub due_date: Option<String>,
+    #[serde(default)]
+    pub done: bool,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -787,6 +807,14 @@ impl Storage {
         Ok(())
     }
 
+    pub fn set_meeting_actions(&self, id: i64, actions: &[Action]) -> Result<()> {
+        self.conn.lock().unwrap().execute(
+            "UPDATE meetings SET actions = ?2 WHERE id = ?1",
+            params![id, serde_json::to_string(actions)?],
+        )?;
+        Ok(())
+    }
+
     pub fn rename_meeting(&self, id: i64, title: &str) -> Result<()> {
         self.conn.lock().unwrap().execute(
             "UPDATE meetings SET title = ?2 WHERE id = ?1",
@@ -799,7 +827,7 @@ impl Storage {
     pub fn meetings(&self) -> Result<Vec<Meeting>> {
         let conn = self.conn.lock().unwrap();
         let mut st = conn.prepare(
-            "SELECT id, started_at, duration_ms, title, dir, status, error, summary, attendees FROM meetings ORDER BY started_at DESC",
+            "SELECT id, started_at, duration_ms, title, dir, status, error, summary, attendees, actions FROM meetings ORDER BY started_at DESC",
         )?;
         let rows = st.query_map([], |r| {
             Ok(Meeting {
@@ -813,6 +841,7 @@ impl Storage {
                 lines: serde_json::Value::Array(vec![]),
                 summary: r.get(7)?,
                 attendees: serde_json::from_str(&r.get::<_, String>(8)?).unwrap_or_default(),
+                actions: serde_json::from_str(&r.get::<_, String>(9)?).unwrap_or_default(),
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<_>>()?)
@@ -821,7 +850,7 @@ impl Storage {
     pub fn meeting(&self, id: i64) -> Result<Option<Meeting>> {
         let conn = self.conn.lock().unwrap();
         let mut st = conn.prepare(
-            "SELECT id, started_at, duration_ms, title, dir, status, error, lines, summary, attendees FROM meetings WHERE id = ?1",
+            "SELECT id, started_at, duration_ms, title, dir, status, error, lines, summary, attendees, actions FROM meetings WHERE id = ?1",
         )?;
         let mut rows = st.query_map(params![id], |r| {
             let lines: String = r.get(7)?;
@@ -836,6 +865,7 @@ impl Storage {
                 lines: serde_json::from_str(&lines).unwrap_or(serde_json::Value::Array(vec![])),
                 summary: r.get(8)?,
                 attendees: serde_json::from_str(&r.get::<_, String>(9)?).unwrap_or_default(),
+                actions: serde_json::from_str(&r.get::<_, String>(10)?).unwrap_or_default(),
             })
         })?;
         Ok(rows.next().transpose()?)

@@ -4,8 +4,10 @@ import {
   errorText,
   events,
   type Meeting,
+  type MeetingAction,
   type MeetingState,
 } from "../api";
+import { isMac } from "../format";
 import { useSettings } from "../App";
 import { useT } from "../i18n";
 import { Button, Notice, PageTitle, Select, TextInput, Toggle } from "../ui";
@@ -256,12 +258,14 @@ function Detail({
 
   const me = settings.ui_language === "it" ? "Io" : "Me";
   const others = settings.ui_language === "it" ? "Altri" : "Others";
-  const text = m.lines
+  const lines = m.lines
     .map(
       (l) =>
         `[${clock(l.start_ms)}] ${l.speaker === "me" ? me : others}: ${l.text}`,
     )
     .join("\n");
+  const todo = actionsMarkdown(m.actions, t("meetings.actions"));
+  const text = todo ? `${todo}\n\n${lines}` : lines;
   const act = async (f: () => Promise<string | null>) => {
     setNotice(null);
     try {
@@ -313,8 +317,8 @@ function Detail({
                 act(async () => {
                   setBusy(true);
                   try {
-                    const summary = await api.summarizeMeeting(id);
-                    setM({ ...m, summary });
+                    const r = await api.summarizeMeeting(id);
+                    setM({ ...m, ...r });
                   } finally {
                     setBusy(false);
                   }
@@ -380,6 +384,29 @@ function Detail({
               {m.summary}
             </div>
           )}
+          {m.actions.length > 0 && (
+            <Actions
+              actions={m.actions}
+              onChange={(actions) => {
+                setM({ ...m, actions });
+                api.saveMeetingActions(id, actions);
+              }}
+              onReminders={() =>
+                act(async () => {
+                  const n = await api.addMeetingReminders(id);
+                  return t("meetings.remindersAdded", { n });
+                })
+              }
+              onCopy={() =>
+                act(
+                  async () => (
+                    await api.copyText(actionsMarkdown(m.actions, "")),
+                    t("files.copied")
+                  ),
+                )
+              }
+            />
+          )}
           {m.lines.length === 0 ? (
             <p className="text-muted">{t("files.noSpeech")}</p>
           ) : (
@@ -402,6 +429,91 @@ function Detail({
         </>
       )}
     </section>
+  );
+}
+
+/** Le cose da fare come elenco Markdown a caselle, con chi e quando. */
+function actionsMarkdown(actions: MeetingAction[], title: string) {
+  if (actions.length === 0) return "";
+  const rows = actions.map((a) => {
+    const who = a.who.trim() ? `**${a.who.trim()}**: ` : "";
+    const due = a.due.trim() ? ` (${a.due.trim()})` : "";
+    return `- [${a.done ? "x" : " "}] ${who}${a.what}${due}`;
+  });
+  return [title && `## ${title}`, ...rows].filter(Boolean).join("\n");
+}
+
+/** Le cose da fare della riunione: si spuntano, si tolgono, si mandano in Promemoria. */
+function Actions({
+  actions,
+  onChange,
+  onReminders,
+  onCopy,
+}: {
+  actions: MeetingAction[];
+  onChange: (actions: MeetingAction[]) => void;
+  onReminders: () => void;
+  onCopy: () => void;
+}) {
+  const t = useT();
+  const open = actions.filter((a) => !a.done).length;
+  return (
+    <div className="mb-4 rounded-[10px] border border-line bg-surface p-4 text-[13px]">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <h3 className="m-0 flex-1 text-[14px] font-semibold">
+          {t("meetings.actions")}{" "}
+          <span className="font-normal text-muted">
+            {t("meetings.actionsOpen", { n: open })}
+          </span>
+        </h3>
+        {isMac && (
+          <Button disabled={open === 0} onClick={onReminders}>
+            {t("meetings.toReminders")}
+          </Button>
+        )}
+        <Button variant="ghost" onClick={onCopy}>
+          {t("meetings.copyActions")}
+        </Button>
+      </div>
+      <ul className="m-0 list-none space-y-1 p-0">
+        {actions.map((a, i) => (
+          <li key={i} className="group flex items-start gap-2">
+            <input
+              type="checkbox"
+              className="mt-[3px]"
+              checked={a.done}
+              aria-label={a.what}
+              onChange={() =>
+                onChange(
+                  actions.map((x, k) =>
+                    k === i ? { ...x, done: !x.done } : x,
+                  ),
+                )
+              }
+            />
+            <span
+              className={`flex-1 ${a.done ? "text-muted line-through" : ""}`}
+            >
+              {a.who.trim() && (
+                <span className="mr-1 font-medium">{a.who.trim()}:</span>
+              )}
+              {a.what}
+              {a.due.trim() && (
+                <span className="ml-1 text-muted">· {a.due.trim()}</span>
+              )}
+            </span>
+            <button
+              type="button"
+              aria-label={t("common.delete")}
+              className="px-1 text-muted opacity-0 group-hover:opacity-100 hover:text-ink focus-visible:opacity-100"
+              onClick={() => onChange(actions.filter((_, k) => k !== i))}
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

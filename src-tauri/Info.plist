@@ -4,6 +4,10 @@
 <dict>
   <key>NSCalendarsFullAccessUsageDescription</key>
   <string>VoxLocal legge l'evento in corso per dare il nome e i partecipanti alle note della riunione. Non modifica il calendario.</string>
+  <key>NSRemindersFullAccessUsageDescription</key>
+  <string>VoxLocal aggiunge a Promemoria le cose da fare delle riunioni, quando lo chiedi.</string>
+  <key>NSRemindersUsageDescription</key>
+  <string>VoxLocal aggiunge a Promemoria le cose da fare delle riunioni, quando lo chiedi.</string>
   <key>NSCalendarsUsageDescription</key>
   <string>VoxLocal legge l'evento in corso per dare il nome e i partecipanti alle note della riunione. Non modifica il calendario.</string>
   <key>NSMicrophoneUsageDescription</key>

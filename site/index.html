@@ -233,6 +233,12 @@
   .mt__who--me { background: #e4fbef; }
   .mt__sum { display: grid; gap: 4px; margin: 0 18px 16px; padding: 10px 12px; border-radius: 10px; background: #e4fbef; font-size: 13px; }
   .mt__sum b { font-weight: 500; }
+  .mt__sumhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+  .mt__rem { padding: 3px 9px; border-radius: 7px; background: #232323; color: #fff; font-size: 12px; font-weight: 500; transition: transform .15s ease, background .3s ease; }
+  .mt__rem.is-press { transform: scale(.94); }
+  .mt__rem.is-done { background: #2fbf71; }
+  .mt__sum > span { display: flex; align-items: center; gap: 8px; }
+  .mt__box { width: 12px; height: 12px; flex: none; border-radius: 3px; border: 1.5px solid rgb(35 35 35 / .45); background: #fff; }
   html.mt-live .mt [data-mt="prompt"], html.mt-live .mt [data-mt="line"], html.mt-live .mt [data-mt="sum"] { transition: opacity .45s ease, transform .55s cubic-bezier(.22,1,.36,1); }
   html.mt-live .mt .is-hid { opacity: 0; transform: translateY(8px); }
   html.mt-live .mt [data-mt="prompt"].is-hid { transform: translateY(-10px) scale(.96); }
@@ -280,6 +286,7 @@
               <p class="t-label">Dettatura</p>
               <a href="#modalita">Modalità<span>Pulito, Email, Elenco, Traduci</span></a>
               <a href="#parli">Correzioni a voce<span>“Anzi” e “a capo” capiti</span></a>
+              <a href="#parli">Rispondi ai messaggi<span>“Rispondi che va bene”</span></a>
               <a href="#parli">Snippet<span>Frasi brevi, testi lunghi</span></a>
             </div>
             <div class="menu-col span-3">
@@ -562,7 +569,7 @@
       <div class="grid">
         <article class="card card--row card--open span-6 m-nolift">
           <h3>Comandi sulla selezione, in ogni app</h3>
-          <p>Selezioni un testo, tieni premuto ⌥ ⇧ Spazio e dici cosa farne.</p>
+          <p>Selezioni un testo e tieni premuto ⌥ ⇧ Spazio per dire cosa farne, oppure tocchi la scorciatoia e lo scrivi. Con “rispondi…” scrive la risposta al messaggio selezionato.</p>
           <div class="panel">
             <div class="stage stage--fade-b"><div class="at-rise to-edge fit" style="--fit-max:400px;--ax:max(24px, 50% - 200px);--ay:56px;--ay-sm:24px">
               <div class="ui ui-panel ui-search" data-ui="search">
@@ -575,9 +582,9 @@
                 <ul class="ui-search__list" data-search-list>
                   <li class="ui-search__row is-sel"><span class="ui-search__ico"><svg class="ui-icon" viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg></span><span class="ui-search__t">Rendi <b>più formale</b></span><span class="ui-search__m">42 parole</span></li>
                   <li class="ui-search__row"><span class="ui-search__ico"><svg class="ui-icon" viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg></span><span class="ui-search__t">Traduci in inglese</span><span class="ui-search__m">Note</span></li>
-                  <li class="ui-search__row"><span class="ui-search__ico"><svg class="ui-icon" viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg></span><span class="ui-search__t">Riassumi in tre punti</span><span class="ui-search__m">Word</span></li>
+                  <li class="ui-search__row"><span class="ui-search__ico"><svg class="ui-icon" viewBox="0 0 16 16"><path d="M4 2.5h5l3 3v8H4z"/><path d="M9 2.5v3h3"/></svg></span><span class="ui-search__t">Rispondi che giovedì va bene</span><span class="ui-search__m">Mail</span></li>
                 </ul>
-                <div class="ui-search__foot"><span>Rilascia per applicare</span><span><kbd>Esc</kbd> annulla</span></div>
+                <div class="ui-search__foot"><span>Invio per applicare</span><span><kbd>Esc</kbd> annulla</span></div>
               </div>
             </div></div>
           </div>
@@ -656,7 +663,7 @@
           <ul class="rows">
             <li><span class="rows__name">Nome e partecipanti</span><span class="muted">Dall'evento del calendario</span></li>
             <li><span class="rows__name">Chi parla</span><span class="muted">Io e Altri, senza eco delle casse</span></li>
-            <li><span class="rows__name">Alla fine</span><span class="muted">Riassunto, decisioni e cose da fare</span></li>
+            <li><span class="rows__name">Alla fine</span><span class="muted">Riassunto e cose da fare, anche in Promemoria</span></li>
           </ul>
         </div>
         <div class="frame frame--split frame--fill span-6 start-7">
@@ -675,7 +682,7 @@
                 <li data-mt="line"><time>02:31</time><span class="mt__who mt__who--me">Io</span><span>Sara, mi mandi gli screenshot nuovi?</span></li>
                 <li data-mt="line"><time>02:36</time><span class="mt__who">Altri</span><span>Sì, entro mercoledì.</span></li>
               </ul>
-              <div class="mt__sum" data-mt="sum"><b>Cose da fare</b><span>Giorgio: note di rilascio, giovedì</span><span>Sara: screenshot, mercoledì</span></div>
+              <div class="mt__sum" data-mt="sum"><div class="mt__sumhead"><b>Cose da fare</b><span class="mt__rem" data-mt="rem">Aggiungi a Promemoria</span></div><span><i class="mt__box"></i>Giorgio: note di rilascio, giovedì 26</span><span><i class="mt__box"></i>Sara: screenshot, mercoledì 25</span></div>
             </div>
           </div>
         </div>
@@ -752,6 +759,7 @@
           <div class="faq__item"><h3>Mi serve una chiave API?</h3><p>No. Senza AI il testo trascritto viene incollato così com'è. Per le modalità puoi usare Ollama sul computer o la chiave di un provider.</p></div>
           <div class="faq__item"><h3>La dettatura funziona se parlo sottovoce?</h3><p>Sì. VoxLocal alza il volume della voce bassa prima di trascriverla, così puoi dettare anche in un open space.</p></div>
           <div class="faq__item"><h3>Come impara i nomi della mia dettatura?</h3><p>VoxLocal propone i nomi e le sigle che tornano nei tuoi dettati: con un clic finiscono nel vocabolario e vengono scritti giusti.</p></div>
+          <div class="faq__item"><h3>VoxLocal può rispondere a una mail?</h3><p>Sì. Selezioni la mail, tieni premuto ⌥ ⇧ Spazio e dici “rispondi che giovedì va bene”: la risposta arriva negli appunti, nella lingua e nel tono della mail.</p></div>
           <div class="faq__item"><h3>Cosa registra VoxLocal durante una riunione?</h3><p>Il tuo microfono e l'audio delle app, in due tracce che restano sul computer. Su macOS serve il permesso Registrazione schermo. Avvisa i partecipanti prima di registrare.</p></div>
           <div class="faq__item"><h3>Perché il Mac dice “sviluppatore non identificato”?</h3><p>Questa versione non è ancora notarizzata da Apple. Apri l'app con clic destro, poi Apri: serve solo la prima volta.</p></div>
         </div>

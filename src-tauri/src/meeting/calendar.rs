@@ -9,7 +9,24 @@ pub struct Event {
 
 /// "granted", "denied" o "undetermined".
 pub fn access(request: bool) -> &'static str {
-    imp::access(request)
+    imp::access(imp::ENTITY_EVENT, request)
+}
+
+/// Il permesso Promemoria, come `access`.
+pub fn reminders_access(request: bool) -> &'static str {
+    imp::access(imp::ENTITY_REMINDER, request)
+}
+
+/// Un promemoria da creare: titolo, note e scadenza (anno, mese, giorno).
+pub struct Reminder {
+    pub title: String,
+    pub notes: String,
+    pub due: Option<(i64, i64, i64)>,
+}
+
+/// Crea i promemoria nella lista predefinita di Promemoria; restituisce quanti ne ha salvati.
+pub fn add_reminders(items: &[Reminder]) -> anyhow::Result<usize> {
+    imp::add_reminders(items)
 }
 
 /// L'evento iniziato da poco o che sta per iniziare (entro 10 minuti), escluso quelli di tutto il giorno.
@@ -33,21 +50,22 @@ mod imp {
     #[link(name = "EventKit", kind = "framework")]
     extern "C" {}
 
-    const ENTITY_EVENT: isize = 0;
+    pub const ENTITY_EVENT: isize = 0;
+    pub const ENTITY_REMINDER: isize = 1;
 
     fn store_class() -> Option<&'static AnyClass> {
         AnyClass::get(c"EKEventStore")
     }
 
-    fn status() -> isize {
+    fn status(entity: isize) -> isize {
         let Some(cls) = store_class() else { return 2 };
         // SAFETY: +[EKEventStore authorizationStatusForEntityType:], sola lettura.
-        unsafe { msg_send![cls, authorizationStatusForEntityType: ENTITY_EVENT] }
+        unsafe { msg_send![cls, authorizationStatusForEntityType: entity] }
     }
 
-    pub fn access(request: bool) -> &'static str {
+    pub fn access(entity: isize, request: bool) -> &'static str {
         // 0 da decidere, 1 limitato, 2 negato, 3 concesso (pieno), 4 solo scrittura
-        match status() {
+        match status(entity) {
             3 => return "granted",
             0 if request => {}
             0 => return "undetermined",
@@ -63,13 +81,18 @@ mod imp {
         // SAFETY: richiesta d'accesso con un blocco di completamento che vive fino alla risposta.
         unsafe {
             let store: Retained<AnyObject> = msg_send![cls, new];
-            let sel = objc2::sel!(requestFullAccessToEventsWithCompletion:);
+            let sel = if entity == ENTITY_EVENT {
+                objc2::sel!(requestFullAccessToEventsWithCompletion:)
+            } else {
+                objc2::sel!(requestFullAccessToRemindersWithCompletion:)
+            };
             let modern: bool = msg_send![&*store, respondsToSelector: sel];
-            if modern {
+            if !modern {
+                let () = msg_send![&*store, requestAccessToEntityType: entity, completion: &*done];
+            } else if entity == ENTITY_EVENT {
                 let () = msg_send![&*store, requestFullAccessToEventsWithCompletion: &*done];
             } else {
-                let () =
-                    msg_send![&*store, requestAccessToEntityType: ENTITY_EVENT, completion: &*done];
+                let () = msg_send![&*store, requestFullAccessToRemindersWithCompletion: &*done];
             }
             // la finestra di sistema aspetta l'utente: fino a 2 minuti
             match rx.recv_timeout(Duration::from_secs(120)) {
@@ -90,8 +113,46 @@ mod imp {
         s.map(|s| s.to_string()).unwrap_or_default()
     }
 
+    pub fn add_reminders(items: &[super::Reminder]) -> anyhow::Result<usize> {
+        anyhow::ensure!(status(ENTITY_REMINDER) == 3, "permesso Promemoria mancante");
+        let cls = store_class().ok_or_else(|| anyhow::anyhow!("EventKit non disponibile"))?;
+        let rem_cls = AnyClass::get(c"EKReminder").ok_or_else(|| anyhow::anyhow!("EKReminder"))?;
+        let comp_cls = AnyClass::get(c"NSDateComponents")
+            .ok_or_else(|| anyhow::anyhow!("NSDateComponents"))?;
+        let mut saved = 0;
+        // SAFETY: EKEventStore e EKReminder creati e usati in questo blocco; l'errore di salvataggio
+        // è un puntatore autoreleased che si legge solo se save restituisce NO.
+        unsafe {
+            let store: Retained<AnyObject> = msg_send![cls, new];
+            let list: Option<Retained<AnyObject>> =
+                msg_send![&*store, defaultCalendarForNewReminders];
+            let list = list.ok_or_else(|| anyhow::anyhow!("nessuna lista in Promemoria"))?;
+            for it in items {
+                let r: Retained<AnyObject> = msg_send![rem_cls, reminderWithEventStore: &*store];
+                let () = msg_send![&*r, setTitle: &*NSString::from_str(&it.title)];
+                let () = msg_send![&*r, setNotes: &*NSString::from_str(&it.notes)];
+                let () = msg_send![&*r, setCalendar: &*list];
+                if let Some((y, m, d)) = it.due {
+                    let c: Retained<AnyObject> = msg_send![comp_cls, new];
+                    let () = msg_send![&*c, setYear: y as isize];
+                    let () = msg_send![&*c, setMonth: m as isize];
+                    let () = msg_send![&*c, setDay: d as isize];
+                    let () = msg_send![&*r, setDueDateComponents: &*c];
+                }
+                let mut err: *mut NSError = std::ptr::null_mut();
+                let ok: bool = msg_send![&*store, saveReminder: &*r, commit: true, error: &mut err];
+                if ok {
+                    saved += 1;
+                } else if let Some(e) = err.as_ref() {
+                    log::warn!("promemoria non salvato: {}", e.localizedDescription());
+                }
+            }
+        }
+        Ok(saved)
+    }
+
     pub fn current_event() -> Option<Event> {
-        if status() != 3 {
+        if status(ENTITY_EVENT) != 3 {
             return None;
         }
         let cls = store_class()?;
@@ -147,8 +208,13 @@ mod imp {
 #[cfg(not(target_os = "macos"))]
 mod imp {
     use super::Event;
-    pub fn access(_request: bool) -> &'static str {
+    pub const ENTITY_EVENT: isize = 0;
+    pub const ENTITY_REMINDER: isize = 1;
+    pub fn access(_entity: isize, _request: bool) -> &'static str {
         "denied"
+    }
+    pub fn add_reminders(_items: &[super::Reminder]) -> anyhow::Result<usize> {
+        anyhow::bail!("Promemoria c'è solo su macOS")
     }
     pub fn current_event() -> Option<Event> {
         None

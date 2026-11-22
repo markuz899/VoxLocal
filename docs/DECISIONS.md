@@ -275,6 +275,18 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Focus:** la barra prende il focus; prima di incollare VoxLocal riattiva l'app di prima per pid (`NSRunningApplication`), la cui selezione è rimasta attiva, e poi ⌘V. Su Windows chiudere la barra ridà il focus alla finestra precedente.
 - **Cronologia:** il comando scritto si salva come quello detto, con `stt_provider = "typed"`.
 
+## D53 — Cose da fare dalla riunione
+
+- **Una sola chiamata all'LLM:** il riassunto di una riunione chiede un JSON con `summary` e `actions` (chi, cosa, scadenza detta, scadenza come data a partire dalla data della riunione). Se il modello non rispetta il formato, tutto il testo diventa il riassunto e le cose da fare restano vuote: niente errore. I file trascritti tengono il riassunto in testo semplice.
+- **Salvate nella riunione** (colonna `actions`, migrazione 8): si spuntano e si tolgono, e Copia e Salva le includono come elenco Markdown a caselle.
+- **Promemoria (macOS):** EventKit, come il calendario; il permesso si chiede al primo clic. Vanno nella lista predefinita solo quelle non spuntate, con la scadenza come data e la riunione nelle note. Su Windows c'è l'elenco da copiare.
+
+## D54 — "Rispondi…": il comando sulla selezione che scrive una risposta
+
+- **Riconoscimento per parole iniziali** ("rispondi", "scrivi una risposta", "reply", "answer"): nessuna chiamata in più all'LLM per capire l'intenzione. Il resto dell'istruzione dice cosa rispondere.
+- **Dove va la risposta:** negli appunti, con un avviso "premi ⌘V dove vuoi incollarla". Il messaggio selezionato di solito non è modificabile (Mail in lettura, Slack), e sostituirlo cancellerebbe il messaggio ricevuto.
+- **Prompt a parte** (`REPLY_SYSTEM`): lingua e tono del messaggio ricevuto, solo il testo della risposta.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

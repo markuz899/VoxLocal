@@ -1,8 +1,9 @@
 // Barra dei comandi sulla selezione (src-tauri/src/palette.rs): scrivi cosa fare del testo
-// selezionato o scegli un comando recente. Invio applica, Esc chiude.
+// selezionato, scegli un comando recente o parla (🎤). Invio applica, Esc chiude.
 import { invoke } from "@tauri-apps/api/core";
+import { formatHotkey } from "../format";
 
-type Data = { words: number; recent: string[]; lang: string };
+type Data = { words: number; hotkey: string; recent: string[]; lang: string };
 
 const $ = <T extends HTMLElement>(id: string) =>
   document.getElementById(id) as T;
@@ -44,6 +45,17 @@ const run = (instruction: string) => {
   done = true;
   invoke("palette_run", { instruction });
 };
+
+// 🎤 o di nuovo la scorciatoia (lato Rust): il comando si detta invece di scriverlo
+const speak = () => {
+  if (done) return;
+  done = true;
+  invoke("palette_speak");
+};
+$("speak").addEventListener("mousedown", (e) => {
+  e.preventDefault();
+  speak();
+});
 
 function render() {
   const q = field.value.trim().toLowerCase();
@@ -111,7 +123,12 @@ invoke<Data>("palette_data").then((d) => {
     : it
       ? "Comandi suggeriti"
       : "Suggested commands";
-  $("hint").textContent = it ? "Invio per applicare" : "Enter to apply";
+  const key = formatHotkey(d.hotkey);
+  $("speak-label").textContent = it ? "Parla" : "Speak";
+  $("speak").title = it ? `Parla (${key})` : `Speak (${key})`;
+  $("hint").textContent = it
+    ? `Invio per applicare, ${key} per parlare`
+    : `Enter to apply, ${key} to speak`;
   $("esc").textContent = it ? "annulla" : "cancel";
   sel = 0;
   render();

@@ -293,6 +293,12 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Solo partendo da "Pulito":** Grezzo vuol dire "non toccare il testo" e Traduci, Elenco o una modalità personalizzata sono scelte apposta, quindi non vengono scavalcate. Le regole dell'utente vincono sempre; si spegne con un interruttore in Modalità.
 - **Niente editor di codice per ora:** Pulito va già bene; si aggiunge se qualcuno lo chiede.
 
+## D56 — La scorciatoia del comando apre sempre la barra
+
+- Con la modalità toggle il primo tocco avviava subito la registrazione e la barra non compariva mai. Ora la scorciatoia del comando apre la barra in entrambe le modalità: scelte rapide, campo da scrivere e pulsante **Parla**. Supera il gesto "tocco o tieni premuto" di D52.
+- **Per parlare:** il pulsante Parla o di nuovo la scorciatoia con la barra aperta. La selezione già copiata passa al dettato, il focus torna all'app di prima e la registrazione si chiude come un dettato normale (rilascio in push-to-talk, nuova pressione in toggle).
+- Costa un tasto in più a chi teneva premuto per parlare subito: in cambio il gesto è uno solo e si vede cosa si può fare.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

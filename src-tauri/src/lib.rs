@@ -119,6 +119,7 @@ pub fn run() {
             commands::palette_data,
             commands::palette_run,
             commands::palette_cancel,
+            commands::palette_speak,
             commands::palette_resize,
             commands::save_meeting_actions,
             commands::add_meeting_reminders,

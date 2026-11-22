@@ -8,13 +8,16 @@
   <body>
     <div class="card" role="dialog" aria-labelledby="field">
       <label class="field">
-        <svg viewBox="0 0 16 16" aria-hidden="true">
-          <path d="M8 2.5v7" />
-          <path d="M5.5 7a2.5 2.5 0 0 0 5 0" />
-          <path d="M8 11.5v2" />
-        </svg>
         <input id="field" autocomplete="off" spellcheck="false" />
         <span id="words" class="meta"></span>
+        <button id="speak" type="button" class="speak">
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <rect x="5.5" y="1.75" width="5" height="8" rx="2.5" />
+            <path d="M3.5 7.5a4.5 4.5 0 0 0 9 0" />
+            <path d="M8 12v2.25" />
+          </svg>
+          <span id="speak-label"></span>
+        </button>
       </label>
       <div id="group" class="group"></div>
       <ul id="list" role="listbox"></ul>

@@ -299,6 +299,13 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Per parlare:** il pulsante Parla o di nuovo la scorciatoia con la barra aperta. La selezione già copiata passa al dettato, il focus torna all'app di prima e la registrazione si chiude come un dettato normale (rilascio in push-to-talk, nuova pressione in toggle).
 - Costa un tasto in più a chi teneva premuto per parlare subito: in cambio il gesto è uno solo e si vede cosa si può fare.
 
+## D57 — Esitazioni tolte con regole, prima dell'LLM
+
+- `fillers::clean` sul testo dettato, in tutte le modalità (anche Grezzo), prima di snippet e LLM: toglie "ehm", "uhm", "um", "uh", "erm", "mmm" (anche allungati) e le parole brevi ripetute per sbaglio ("il il", "I I"). Sistema virgole e maiuscola che restavano attorno.
+- **Prudente apposta:** "eh", "ah" e "oh" restano (interiezioni vere), "m" da sola resta (metri), le ripetizioni volute ("piano piano", "molto molto") restano perché si toglie solo una lista chiusa di parole brevi. False partenze e autocorrezioni ("anzi") restano all'LLM.
+- In cronologia l'originale (`raw_text`) resta com'era. File e riunioni non passano di qui: lì serve la trascrizione fedele.
+- Prossimo passo valutato: un modello locale (llama-server + Qwen3 1.7B) per Pulito senza Ollama; rimandato.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

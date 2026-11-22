@@ -218,6 +218,13 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] "piano piano" e "eh sì" restano come detti.
 - [ ] In cronologia l'originale mostra ancora gli "ehm".
 
+## Dettature lunghe a pezzi
+
+- [ ] Detta 1-2 minuti con qualche pausa: al rilascio il testo arriva in pochi secondi, completo. Nel log: "pezzo di N s trascritto durante il dettato".
+- [ ] Detta 40 s senza pause: si taglia comunque e il testo è completo.
+- [ ] Esc a metà di una dettatura lunga: niente viene incollato.
+- [ ] Dettato breve (meno di 12 s): come prima, nessun pezzo.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

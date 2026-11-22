@@ -1,7 +1,7 @@
 //! Cattura dal microfono (cpal) e resampling a 16 kHz mono (rubato).
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -63,6 +63,22 @@ fn rms(s: &[f32]) -> f32 {
 pub struct Recorder {
     stop: Arc<AtomicBool>,
     handle: JoinHandle<Result<AudioBuffer>>,
+    tap: Tap,
+}
+
+/// L'audio registrato finora, leggibile mentre la registrazione continua (dettature a pezzi).
+#[derive(Clone)]
+pub struct Tap {
+    samples: Arc<Mutex<Vec<f32>>>,
+    pub rate: u32,
+}
+
+impl Tap {
+    /// Copia dei campioni da `from` alla fine (vuota se `from` è oltre).
+    pub fn from(&self, from: usize) -> Vec<f32> {
+        let s = self.samples.lock().unwrap();
+        s.get(from..).map(<[f32]>::to_vec).unwrap_or_default()
+    }
 }
 
 impl Recorder {
@@ -70,8 +86,10 @@ impl Recorder {
     /// `on_level` riceve l'RMS ~30 volte al secondo.
     pub fn start(device: Option<String>, on_level: impl Fn(f32) + Send + 'static) -> Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
-        let (ready_tx, ready_rx) = mpsc::channel::<Result<()>>();
+        let (ready_tx, ready_rx) = mpsc::channel::<Result<u32>>();
         let stop_t = stop.clone();
+        let shared = Arc::new(Mutex::new(Vec::new()));
+        let shared_t = shared.clone();
 
         let handle = std::thread::Builder::new()
             .name("voxlocal-audio".into())
@@ -79,7 +97,7 @@ impl Recorder {
                 let opened = open(device.as_deref());
                 let (stream, mut cons, rate) = match opened {
                     Ok(v) => {
-                        let _ = ready_tx.send(Ok(()));
+                        let _ = ready_tx.send(Ok(v.2));
                         v
                     }
                     Err(e) => {
@@ -87,32 +105,44 @@ impl Recorder {
                         return Err(e);
                     }
                 };
-                let mut samples = Vec::with_capacity(rate as usize * 30);
-                let mut drain = |samples: &mut Vec<f32>| -> usize {
+                shared_t.lock().unwrap().reserve(rate as usize * 30);
+                let mut fresh = Vec::new();
+                let mut drain = |fresh: &mut Vec<f32>| {
+                    fresh.clear();
                     let n = cons.slots();
                     if let Ok(chunk) = cons.read_chunk(n) {
-                        samples.extend(chunk);
+                        fresh.extend(chunk);
                     }
-                    n
+                    shared_t.lock().unwrap().extend_from_slice(fresh);
                 };
                 while !stop_t.load(Ordering::Relaxed) {
                     std::thread::sleep(Duration::from_millis(33));
-                    let start = samples.len();
-                    drain(&mut samples);
-                    on_level(rms(&samples[start..]));
+                    drain(&mut fresh);
+                    on_level(rms(&fresh));
                 }
                 drop(stream);
-                drain(&mut samples);
+                drain(&mut fresh);
                 Ok(AudioBuffer {
-                    samples,
+                    samples: std::mem::take(&mut *shared_t.lock().unwrap()),
                     sample_rate: rate,
                 })
             })?;
 
-        ready_rx
+        let rate = ready_rx
             .recv_timeout(Duration::from_secs(2))
             .context("il microfono non risponde")??;
-        Ok(Self { stop, handle })
+        Ok(Self {
+            stop,
+            handle,
+            tap: Tap {
+                samples: shared,
+                rate,
+            },
+        })
+    }
+
+    pub fn tap(&self) -> Tap {
+        self.tap.clone()
     }
 
     /// Ferma la cattura e restituisce l'audio alla frequenza nativa del device.
@@ -251,6 +281,39 @@ where
     Ok(stream)
 }
 
+/// Dove tagliare l'audio non ancora trascritto di una dettatura in corso (`pending`, alla frequenza
+/// `rate`): nell'ultima pausa di almeno 0,4 s dopo i primi 12 s, oppure, oltre i 30 s senza pause,
+/// nel punto più silenzioso degli ultimi secondi. `None` = aspetta ancora.
+pub fn next_cut(pending: &[f32], rate: u32) -> Option<usize> {
+    const MIN_S: usize = 12;
+    const MAX_S: usize = 30;
+    const QUIET_FRAMES: usize = 4;
+    let frame = (rate / 10).max(1) as usize; // 100 ms
+    if pending.len() < MIN_S * rate as usize {
+        return None;
+    }
+    let levels: Vec<f32> = pending.chunks_exact(frame).map(rms).collect();
+    let avg = levels.iter().sum::<f32>() / levels.len() as f32;
+    // una pausa è molto sotto il volume medio della voce: niente soglia fissa, il microfono cambia
+    let quiet = |l: f32| l < avg * 0.2;
+    let first = MIN_S * 10;
+    // l'ultima pausa: il pezzo più lungo possibile, meno spezzature
+    for end in (first + QUIET_FRAMES..levels.len()).rev() {
+        if levels[end - QUIET_FRAMES..end].iter().all(|&l| quiet(l)) {
+            return Some((end - QUIET_FRAMES / 2) * frame);
+        }
+    }
+    if levels.len() < MAX_S * 10 {
+        return None;
+    }
+    let from = (MAX_S - 10) * 10;
+    let (i, _) = levels[from..]
+        .iter()
+        .enumerate()
+        .min_by(|a, b| a.1.total_cmp(b.1))?;
+    Some((from + i) * frame + frame / 2)
+}
+
 /// Porta l'audio a 16 kHz in un'unica passata (vedi DECISIONS D6).
 pub fn to_16k(buf: AudioBuffer) -> Result<AudioBuffer> {
     if buf.sample_rate == WHISPER_RATE || buf.samples.is_empty() {
@@ -372,6 +435,59 @@ pub fn decode_file(path: &std::path::Path) -> Result<AudioBuffer> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Voce finta: un tono a 0,3 di ampiezza; le pause sono silenzio.
+    fn speech(secs: &[(f32, bool)], rate: u32) -> Vec<f32> {
+        let mut out = vec![];
+        for &(s, voiced) in secs {
+            let n = (s * rate as f32) as usize;
+            out.extend((0..n).map(|i| {
+                if voiced {
+                    0.3 * (i as f32 * 0.07).sin()
+                } else {
+                    0.0
+                }
+            }));
+        }
+        out
+    }
+
+    #[test]
+    fn cuts_in_the_last_pause_after_twelve_seconds() {
+        let rate = 16_000;
+        // pausa a 5 s (troppo presto), pausa a 14 s, pausa a 18 s: si taglia in quella a 18 s
+        let a = speech(
+            &[
+                (5.0, true),
+                (0.6, false),
+                (8.4, true),
+                (0.6, false),
+                (3.4, true),
+                (0.6, false),
+                (2.0, true),
+            ],
+            rate,
+        );
+        let cut = next_cut(&a, rate).expect("c'è una pausa dopo 12 s");
+        let at = cut as f32 / rate as f32;
+        assert!((18.0..18.7).contains(&at), "taglio a {at} s");
+        // prima dei 12 s non si taglia mai
+        assert_eq!(next_cut(&a[..11 * rate as usize], rate), None);
+    }
+
+    #[test]
+    fn without_pauses_waits_then_cuts_at_the_quietest_point() {
+        let rate = 16_000;
+        let mut a = speech(&[(31.0, true)], rate);
+        assert_eq!(next_cut(&a[..25 * rate as usize], rate), None);
+        // un calo di volume a 24 s, non abbastanza per una pausa vera: è il punto più basso
+        let dip = 24 * rate as usize;
+        for s in &mut a[dip..dip + rate as usize / 10] {
+            *s *= 0.5;
+        }
+        let at = next_cut(&a, rate).unwrap() as f32 / rate as f32;
+        assert!((24.0..24.2).contains(&at), "taglio a {at} s");
+    }
 
     #[test]
     fn boosts_only_quiet_audio() {

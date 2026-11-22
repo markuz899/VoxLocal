@@ -195,6 +195,13 @@
   .vx .pl__panel { background: #fff; }
   .vx .pl__bar { display: flex; align-items: center; gap: 14px; padding: 12px 18px; font-size: 13px; color: #686868; }
   .vx .pl__bar .dots { display: flex; gap: 6px; } .vx .pl__bar .dots i { width: 10px; height: 10px; border-radius: 50%; background: #dcdcdc; }
+  .fx { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-6); margin-top: var(--s-6); }
+  .fx__col h3 { font: 500 var(--t-lead)/1.3 var(--font-text); margin: 0 0 var(--s-3); padding-bottom: var(--s-3); border-bottom: 1px solid var(--line); }
+  .fx__col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-4); }
+  .fx__col li { display: grid; gap: 2px; font-size: 15px; line-height: 1.45; }
+  .fx__col li span { color: var(--muted); }
+  @media (max-width: 1023px) { .fx { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 639px) { .fx { grid-template-columns: 1fr; } }
   .vx .pl__bar b { color: #232323; font-weight: 500; }
   .vx .pl__side { display: grid; align-content: start; gap: 4px; padding: 16px; font-size: 13px; }
   .vx .pl__side small { color: #686868; margin: 8px 0 4px; }
@@ -295,6 +302,7 @@
               <a href="#registrazioni">Registrazioni<span>Audio e video in testo</span></a>
               <a href="#cronologia">Cronologia<span>Ogni dettato, con l'originale</span></a>
               <a href="#parli">Statistiche<span>Il tempo che risparmi</span></a>
+              <a href="#funzioni">Tutte le funzioni<span>L'elenco completo</span></a>
             </div>
             <a class="menu-card span-3 start-10" href="#riunioni">
               <div class="panel"><div class="stage stage--fade-br"><div class="at-corner" style="--ax:24px;--ay:24px">
@@ -709,6 +717,20 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section ground-surface" id="funzioni" aria-labelledby="funzioni-h">
+    <div class="wrap">
+      <div class="section-head">
+        <h2 id="funzioni-h">Tutte le funzioni di VoxLocal</h2>
+      </div>
+      <div class="fx">
+        <div class="fx__col"><h3>Dettatura</h3><ul><li><b>Una scorciatoia per dettare</b><span>Tieni premuto ⌥ Spazio o premilo una volta per iniziare e una per finire, in qualsiasi app.</span></li><li><b>Trascrizione sul computer</b><span>Whisper gira sul Mac o sul PC, anche offline. Se vuoi, Groq o OpenAI in cloud.</span></li><li><b>Voce bassa</b><span>Alza il volume della voce sussurrata prima di trascriverla.</span></li><li><b>Correzioni a voce</b><span>“Anzi” e “a capo” diventano testo corretto.</span></li><li><b>Vocabolario</b><span>Nomi e sigle scritti come vuoi tu, con i suggerimenti presi dai tuoi dettati.</span></li><li><b>Snippet</b><span>Una frase breve detta a voce diventa un testo lungo già pronto.</span></li></ul></div>
+        <div class="fx__col"><h3>Testo e comandi</h3><ul><li><b>Modalità</b><span>Pulito, Email, Messaggio, Elenco e Traduci, più quelle che scrivi tu o prendi dalla libreria.</span></li><li><b>Stile per app</b><span>In Slack o WhatsApp esce un messaggio, in Mail un'email. Le regole si cambiano per ogni app.</span></li><li><b>Comando sulla selezione</b><span>Selezioni un testo, premi ⌥ ⇧ Spazio e scegli, scrivi o dici cosa farne.</span></li><li><b>Rispondi ai messaggi</b><span>“Rispondi che giovedì va bene” scrive la risposta alla mail selezionata.</span></li><li><b>Provider AI a scelta</b><span>Ollama, LM Studio e llama.cpp sul computer, o OpenAI, Anthropic, Gemini, Groq, Mistral e altri con la tua chiave.</span></li></ul></div>
+        <div class="fx__col"><h3>Registrazioni e riunioni</h3><ul><li><b>Trascrivi un file</b><span>MP3, M4A, MP4, MOV, MKV e WAV in testo, con il riassunto.</span></li><li><b>Note delle riunioni</b><span>Il tuo microfono e l'audio delle app in due tracce, con titolo e partecipanti presi dal calendario del Mac.</span></li><li><b>Chiamate riconosciute</b><span>Quando parte una chiamata su Zoom, Meet o Teams, propone di registrare le note.</span></li><li><b>Cose da fare</b><span>Chi fa cosa e per quando, da spuntare, copiare o mandare in Promemoria sul Mac.</span></li><li><b>Chiedi alle riunioni</b><span>Una domanda sulle riunioni e i dettati passati, con la risposta e le fonti.</span></li></ul></div>
+        <div class="fx__col"><h3>Cronologia e controllo</h3><ul><li><b>Cronologia</b><span>Ogni dettato con il testo originale, da cercare e filtrare.</span></li><li><b>Statistiche</b><span>Le parole dettate e il tempo che risparmi rispetto a scriverle.</span></li><li><b>Appunti rimessi a posto</b><span>Dopo aver incollato, negli appunti torna quello che c'era prima.</span></li><li><b>Backup</b><span>Vocabolario, snippet, modalità e regole in un file da esportare e importare.</span></li><li><b>Chiavi nel portachiavi</b><span>Le chiavi dei provider restano nel portachiavi del sistema.</span></li><li><b>Mac, Windows e Linux</b><span>In italiano e in inglese, con gli aggiornamenti automatici.</span></li></ul></div>
       </div>
     </div>
   </section>

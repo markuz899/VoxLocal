@@ -428,15 +428,23 @@ impl Pipeline {
                 .unwrap_or_else(|| transcript.text.clone()),
         };
         d.final_text = input.clone();
-        // Una regola "app → modalità" vince sulla modalità scelta nel menu. Uno snippet salta le modalità.
+        // Una regola "app → modalità" (poi lo stile automatico) vince sulla modalità del menu. Uno snippet salta le modalità.
         let mode_slug = if snippet.is_some() {
             String::new()
         } else {
-            target_app
-                .as_deref()
-                .and_then(|app| crate::context::mode_for_app(app, &settings.app_modes))
-                .unwrap_or(&settings.active_mode)
-                .to_string()
+            let app = target_app.as_deref().unwrap_or_default();
+            crate::context::mode_for_app(app, &settings.app_modes)
+                .map(str::to_string)
+                .or_else(|| {
+                    // stile automatico (chat → Messaggio, mail → Email) se quella modalità esiste ancora
+                    settings
+                        .app_styles_auto
+                        .then(|| crate::context::auto_mode_for_app(app, &settings.active_mode))
+                        .flatten()
+                        .filter(|slug| matches!(self.storage.mode(slug), Ok(Some(_))))
+                        .map(str::to_string)
+                })
+                .unwrap_or_else(|| settings.active_mode.clone())
         };
 
         // Post-processing LLM: qualunque errore → si incolla il testo grezzo (mai perdere il dettato).

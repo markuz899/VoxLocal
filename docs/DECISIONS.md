@@ -287,6 +287,12 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Dove va la risposta:** negli appunti, con un avviso "premi ⌘V dove vuoi incollarla". Il messaggio selezionato di solito non è modificabile (Mail in lettura, Slack), e sostituirlo cancellerebbe il messaggio ricevuto.
 - **Prompt a parte** (`REPLY_SYSTEM`): lingua e tono del messaggio ricevuto, solo il testo della risposta.
 
+## D55 — Stile automatico per app (chat e mail)
+
+- **Elenco fisso nel codice** (`context::AUTO_APP_MODES`): chat → Messaggio, mail → Email, per parte del nome come le regole. Nessuna regola da scrivere: l'utente lo trova già attivo.
+- **Solo partendo da "Pulito":** Grezzo vuol dire "non toccare il testo" e Traduci, Elenco o una modalità personalizzata sono scelte apposta, quindi non vengono scavalcate. Le regole dell'utente vincono sempre; si spegne con un interruttore in Modalità.
+- **Niente editor di codice per ora:** Pulito va già bene; si aggiunge se qualcuno lo chiede.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

@@ -135,6 +135,37 @@ pub fn mode_for_app<'a>(app: &str, rules: &'a [crate::settings::AppMode]) -> Opt
         .map(|r| r.mode.as_str())
 }
 
+/// Stile automatico: (parte del nome dell'app, modalità). Le regole dell'utente vincono sempre.
+pub const AUTO_APP_MODES: &[(&str, &str)] = &[
+    ("slack", "message"),
+    ("whatsapp", "message"),
+    ("telegram", "message"),
+    ("messages", "message"),
+    ("messaggi", "message"),
+    ("discord", "message"),
+    ("teams", "message"),
+    ("signal", "message"),
+    ("mail", "email"),
+    ("outlook", "email"),
+    ("spark", "email"),
+    ("thunderbird", "email"),
+    ("airmail", "email"),
+    ("mimestream", "email"),
+];
+
+/// Modalità automatica per l'app: vale solo partendo da "Pulito", così Traduci, Elenco o una
+/// modalità personalizzata scelte apposta non vengono scavalcate.
+pub fn auto_mode_for_app(app: &str, active_mode: &str) -> Option<&'static str> {
+    if active_mode != "clean" {
+        return None;
+    }
+    let app = app.to_lowercase();
+    AUTO_APP_MODES
+        .iter()
+        .find(|(name, _)| app.contains(name))
+        .map(|(_, mode)| *mode)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -162,6 +193,22 @@ mod tests {
             Some("email")
         );
         assert_eq!(mode_for_app("Code", &rules), None);
+    }
+
+    #[test]
+    fn auto_style_only_from_clean() {
+        assert_eq!(auto_mode_for_app("Slack", "clean"), Some("message"));
+        assert_eq!(
+            auto_mode_for_app("Microsoft Outlook", "clean"),
+            Some("email")
+        );
+        assert_eq!(
+            auto_mode_for_app("Microsoft Teams", "clean"),
+            Some("message")
+        );
+        assert_eq!(auto_mode_for_app("Code", "clean"), None);
+        assert_eq!(auto_mode_for_app("Slack", "translate_en"), None);
+        assert_eq!(auto_mode_for_app("Slack", "raw"), None);
     }
 
     /// Da lanciare a mano su un desktop: cargo test --lib frontmost -- --ignored --nocapture

@@ -9,7 +9,7 @@ import {
 import { useSettings } from "../App";
 import { languageOptions } from "../format";
 import { MODE_LIBRARY, modeName, useT, type Lang } from "../i18n";
-import { Button, Notice, PageTitle, Select, TextInput } from "../ui";
+import { Button, Notice, PageTitle, Select, TextInput, Toggle } from "../ui";
 
 const BUILTIN = ["raw", "clean", "email", "message", "bullets", "translate_en"];
 
@@ -384,6 +384,19 @@ function AppRules({ modes }: { modes: Mode[] }) {
         {t("rules.title")}
       </h2>
       <p className="mb-4 max-w-[60ch] text-muted">{t("rules.description")}</p>
+      <div className="mb-3 flex items-start gap-3 rounded-[10px] border border-line bg-surface px-4 py-3">
+        <div className="flex-1">
+          <div className="font-medium">{t("rules.auto")}</div>
+          <p className="max-w-[60ch] text-[12px] text-muted">
+            {t("rules.autoHint")}
+          </p>
+        </div>
+        <Toggle
+          label={t("rules.auto")}
+          checked={settings.app_styles_auto}
+          onChange={async (v) => setError(await update({ app_styles_auto: v }))}
+        />
+      </div>
       <div className="divide-y divide-line rounded-[10px] border border-line bg-surface">
         {rules.length === 0 && (
           <p className="px-4 py-3 text-muted">{t("rules.empty")}</p>

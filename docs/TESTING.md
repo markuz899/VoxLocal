@@ -204,6 +204,14 @@ Il dato "fine parlato → incolla" completo (incluso incolla) si legge nel log a
 - [ ] Dalla barra (tocco): "Rispondi in modo cordiale" funziona allo stesso modo.
 - [ ] Un comando normale ("rendilo più formale") sostituisce ancora la selezione.
 
+## Stile automatico per app
+
+- [ ] Modalità attiva Pulito, detta in Slack: esce un messaggio breve, nella cronologia la modalità è Messaggio.
+- [ ] Stessa cosa in Mail (nuovo messaggio): esce un'email con saluto e chiusura.
+- [ ] Modalità attiva Traduci o Grezzo, detta in Slack: resta Traduci o Grezzo.
+- [ ] Una regola "Slack usa Elenco puntato" vince sullo stile automatico.
+- [ ] Interruttore spento in Modalità: Slack torna a Pulito.
+
 ## Checklist di rilascio
 
 Prima di pubblicare la bozza creata dal workflow Release (vedi [RELEASE.md](RELEASE.md)):

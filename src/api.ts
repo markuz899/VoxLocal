@@ -32,6 +32,7 @@ export interface Settings {
   vocab_dismissed: string[];
   meeting_auto_detect: boolean;
   meeting_calendar: boolean;
+  app_styles_auto: boolean;
 }
 
 export interface Segment {

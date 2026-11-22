@@ -19,7 +19,6 @@ tauri-build = { version = "2.7.6", features = [] }
 anyhow = "1.0.104"
 arboard = "3.7.0"
 async-trait = "0.1.92"
-block2 = "0.6"
 cpal = "0.18.2"
 dirs = "7.0.0"
 enigo = "0.6.1"
@@ -65,6 +64,7 @@ whisper-rs = { version = "=0.16.0", features = ["log_backend"] }
 whisper-rs = { version = "=0.16.0", features = ["metal", "log_backend"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
 objc2 = "0.6"
 objc2-core-media = { version = "0.3", features = ["CMSampleBuffer", "CMBlockBuffer", "CMBase"] }
 objc2-foundation = { version = "0.3", features = ["NSString", "NSDate", "NSError"] }

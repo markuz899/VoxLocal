@@ -776,9 +776,11 @@ impl Pipeline {
             .as_ref()
             .map(|t| t.selected.split_whitespace().count())
             .unwrap_or(0);
+        // in una variabile: un lock dentro l'espressione finale resterebbe preso fino a `self.lang()`
+        let hotkey = self.settings.lock().unwrap().command_hotkey.clone();
         PaletteData {
             words,
-            hotkey: self.settings.lock().unwrap().command_hotkey.clone(),
+            hotkey,
             recent: self.storage.recent_commands(5).unwrap_or_default(),
             lang: self.lang(),
         }

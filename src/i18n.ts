@@ -126,6 +126,9 @@ const en = {
   "rules.description":
     "When you dictate in an app on this list, VoxLocal uses its mode instead of the active one. Part of the name is enough: “Mail” also matches “Microsoft Outlook Mail”.",
   "rules.empty": "No rules: every dictation uses the active mode.",
+  "rules.auto": "Automatic style for chats and mail",
+  "rules.autoHint":
+    "With Clean as the active mode, dictations in Slack, WhatsApp, Telegram, Messages, Discord and Teams become short chat messages, and in Mail, Outlook and Spark they become emails. Your rules below always win.",
   "rules.app": "App",
   "rules.appPlaceholder": "App name",
   "rules.uses": "uses",
@@ -541,6 +544,9 @@ const it: Record<Key, string> = {
   "rules.description":
     "Quando detti in un'app di questo elenco, VoxLocal usa la sua modalità al posto di quella attiva. Basta una parte del nome: “Mail” vale anche per “Microsoft Outlook Mail”.",
   "rules.empty": "Nessuna regola: ogni dettato usa la modalità attiva.",
+  "rules.auto": "Stile automatico per chat e mail",
+  "rules.autoHint":
+    "Con Pulito come modalità attiva, i dettati in Slack, WhatsApp, Telegram, Messaggi, Discord e Teams diventano messaggi brevi da chat, quelli in Mail, Outlook e Spark diventano email. Le tue regole qui sotto vincono sempre.",
   "rules.app": "App",
   "rules.appPlaceholder": "Nome dell'app",
   "rules.uses": "usa",

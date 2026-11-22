@@ -64,6 +64,8 @@ pub struct Settings {
     pub meeting_auto_detect: bool,
     /// Prende titolo e partecipanti della riunione dall'evento in corso nel calendario.
     pub meeting_calendar: bool,
+    /// Con la modalità "Pulito" attiva, chat e mail usano da sole Messaggio ed Email (`context::AUTO_APP_MODES`).
+    pub app_styles_auto: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -103,6 +105,7 @@ impl Default for Settings {
             vocab_dismissed: vec![],
             meeting_auto_detect: true,
             meeting_calendar: false,
+            app_styles_auto: true,
         }
     }
 }

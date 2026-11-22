@@ -5,7 +5,7 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
 pub const LABEL: &str = "palette";
 const WIDTH: f64 = 560.0;
-const HEIGHT: f64 = 340.0;
+const HEIGHT: f64 = 360.0;
 
 pub fn show(app: &AppHandle) {
     let app = app.clone();

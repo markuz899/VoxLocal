@@ -126,7 +126,7 @@ export default function Transcription() {
               hint={
                 pct !== undefined
                   ? t("stt.downloading", { pct: Math.floor(pct) })
-                  : `${note}, ${formatBytes(m.size, lang)}`
+                  : `${note}, ${formatBytes(m.size, lang)}${m.slow ? `. ${t("model.slowHere")}` : ""}`
               }
             >
               {inUse && m.installed ? (

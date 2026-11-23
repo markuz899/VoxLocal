@@ -227,6 +227,26 @@ pub fn run() {
                 pipeline.ensure_model();
             } else {
                 open_main(&handle, Some("onboarding"));
+                // Ollama come provider solo se è installato e acceso: senza, la pulizia fallirebbe
+                // a ogni dettato (e su un PC senza GPU sarebbe comunque lenta).
+                if settings.default_llm == llm::registry::NONE_ID {
+                    let p = pipeline.clone();
+                    tauri::async_runtime::spawn(async move {
+                        let up = llm::http()
+                            .get("http://localhost:11434/api/tags")
+                            .timeout(Duration::from_secs(2))
+                            .send()
+                            .await
+                            .is_ok_and(|r| r.status().is_success());
+                        if up {
+                            let mut s = p.settings();
+                            s.default_llm = "ollama".into();
+                            if let Err(e) = p.apply_settings(s) {
+                                log::warn!("provider Ollama non impostato: {e:#}");
+                            }
+                        }
+                    });
+                }
             }
 
             // Rilascia il modello whisper dopo `keep_warm_minutes` di inattività.

@@ -164,6 +164,8 @@ impl LocalWhisper {
             p.set_initial_prompt(prompt);
         }
         p.set_no_context(true);
+        // whisper-rs ne usa al massimo 4: senza GPU (Windows, Linux) è il collo di bottiglia
+        p.set_n_threads(threads());
         // I segmenti con l'orario servono solo alla trascrizione lunga.
         p.set_no_timestamps(progress.is_none());
         if let Some(cb) = progress {
@@ -278,6 +280,11 @@ impl SttProvider for LocalWhisper {
         let (me, audio, opts) = (self.clone(), audio.clone(), opts.clone());
         tokio::task::spawn_blocking(move || me.transcribe_blocking(&audio, &opts)).await?
     }
+}
+
+/// Thread per whisper: tutti i core logici, fino a 8 (oltre il guadagno è minimo).
+fn threads() -> i32 {
+    std::thread::available_parallelism().map_or(4, |n| n.get().min(8) as i32)
 }
 
 #[cfg(test)]

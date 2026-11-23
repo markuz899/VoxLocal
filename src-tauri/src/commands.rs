@@ -56,6 +56,7 @@ pub struct ModelView {
     size: u64,
     installed: bool,
     recommended: bool,
+    slow: bool,
 }
 
 #[tauri::command]
@@ -68,6 +69,7 @@ pub fn list_models() -> Vec<ModelView> {
             size: m.size,
             installed: models::is_installed(m),
             recommended: m.id == models::recommended(),
+            slow: models::slow_here(m.id),
         })
         .collect()
 }

@@ -59,6 +59,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
     env:
       HAS_APPLE_SIGNING: ${{ secrets.APPLE_CERTIFICATE != '' }}
+      # whisper.cpp di default si compila per il processore della macchina di build: sui runner
+      # di GitHub (con AVX-512) ne esce un eseguibile che si chiude di colpo sui PC senza quelle
+      # istruzioni. Spento, usa AVX2/FMA/F16C: qualsiasi x86 dal 2013 in poi.
+      GGML_NATIVE: "OFF"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -90,6 +94,8 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          # GGML_NATIVE non fa ricompilare whisper-rs-sys: chiave nuova, cache nuova
+          key: portable-cpu
       - run: pnpm install --frozen-lockfile
 
       # Firma e notarizzazione Apple solo se i segreti esistono: senza, la build resta firmata

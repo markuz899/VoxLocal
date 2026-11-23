@@ -168,6 +168,7 @@ export interface ModelView {
   size: number;
   installed: boolean;
   recommended: boolean;
+  slow: boolean;
 }
 
 export interface Mode {

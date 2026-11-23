@@ -313,6 +313,15 @@ Formato breve: decisione → perché → alternative scartate. Le dipendenze "pe
 - **Sicurezza:** se un pezzo fallisce, al rilascio si trascrive tutto l'audio come prima. I pezzi silenziosi si saltano. Vale anche con lo STT in cloud.
 - **Misura** (`examples/chunked.rs`, M1 8 GB, large-v3-turbo, 146 s di parlato): attesa dopo il rilascio da 13,0 s a 2,7 s. La trascrizione intera aveva perso due paragrafi, quella a pezzi no.
 
+## D59 — Windows e Linux senza GPU
+
+Su Windows (v0.2.1) large-v3-turbo ha impiegato 136 s per 4 s di audio: senza Metal whisper gira solo sul processore.
+- **Build portabile:** `GGML_NATIVE=OFF` in release.yml. Prima whisper.cpp si compilava per il processore del runner (AVX-512) e l'app si chiudeva alla prima trascrizione sui PC senza.
+- **Thread:** whisper usa tutti i core logici fino a 8, non più 4. Sul Mac (Metal) la misura di D58 non cambia (13,2 s / 2,8 s).
+- **Modelli pesanti:** fuori dai Mac Apple Silicon medium e large mostrano l'avviso "troppo lento senza GPU"; il consigliato resta base.
+- **Ollama:** non è più il provider predefinito a scatola chiusa. Al primo avvio diventa predefinito solo se risponde su localhost:11434; altrimenti "nessuno" (restano le regole di D57).
+- **Prossimo passo:** GPU su Windows/Linux con il backend Vulkan di whisper.cpp, da provare su un PC vero.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

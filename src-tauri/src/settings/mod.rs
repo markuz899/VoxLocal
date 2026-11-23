@@ -89,7 +89,8 @@ impl Default for Settings {
             restore_delay_ms: 250,
             max_seconds: 600,
             active_mode: crate::storage::RAW_SLUG.into(),
-            default_llm: "ollama".into(),
+            // al primo avvio diventa "ollama" solo se Ollama risponde (lib.rs)
+            default_llm: crate::llm::registry::NONE_ID.into(),
             providers: vec![],
             stt_provider: "local".into(),
             llm_timeout_s: 15,

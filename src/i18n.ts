@@ -87,6 +87,8 @@ const en = {
   "model.tiny": "The fastest, often wrong",
   "model.tiny-q5_1": "The lightest, often wrong",
   "model.base": "Fast, inaccurate with real voices",
+  "model.slowHere":
+    "Too slow on this computer without a GPU: a sentence can take minutes",
   "model.base-q5_1": "Fast and light, inaccurate",
   "model.small": "Balanced",
   "model.small-q5_1": "Balanced and light",
@@ -505,6 +507,8 @@ const it: Record<Key, string> = {
   "model.tiny": "Il più veloce, sbaglia spesso",
   "model.tiny-q5_1": "Il più leggero, sbaglia spesso",
   "model.base": "Veloce, impreciso con la voce reale",
+  "model.slowHere":
+    "Troppo lento su questo computer senza GPU: una frase può richiedere minuti",
   "model.base-q5_1": "Veloce e leggero, impreciso",
   "model.small": "Equilibrato",
   "model.small-q5_1": "Equilibrato e leggero",

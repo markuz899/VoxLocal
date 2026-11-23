@@ -1,45 +1,26 @@
 name: Bench velocità
 
-# Temporaneo: perché whisper su Windows (MSVC) è ~16× più lento che su Linux sullo stesso runner.
+# Temporaneo: con il generatore Visual Studio cmake-rs riscrive CMAKE_C_FLAGS_RELEASE senza /O2.
 on:
   push:
     branches: [bench/windows-speed]
 
 jobs:
   bench:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: msvc
-            features: ""
-            toolset: ""
-          - name: clangcl
-            features: ""
-            toolset: ClangCL
-          - name: msvc-openmp
-            features: --features whisper-rs/openmp
-            toolset: ""
-    name: windows ${{ matrix.name }}
     runs-on: windows-latest
     env:
       GGML_NATIVE: "OFF"
+      CMAKE_C_FLAGS_RELEASE: "-nologo -MD -O2 -Ob2 -DNDEBUG"
+      CMAKE_CXX_FLAGS_RELEASE: "-nologo -MD -O2 -Ob2 -DNDEBUG /utf-8"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Toolset
-        if: matrix.toolset != ''
-        shell: bash
-        run: echo "CMAKE_GENERATOR_TOOLSET=${{ matrix.toolset }}" >> "$GITHUB_ENV"
       - name: Build
         working-directory: src-tauri
-        run: cargo build --release --example bench ${{ matrix.features }}
-      - name: Flag di compilazione di whisper.cpp
-        shell: bash
-        working-directory: src-tauri
-        run: |
-          f=$(ls target/release/build/whisper-rs-sys-*/output | head -1)
-          grep -oiE '/arch:[A-Z0-9]+|-march=[a-z0-9-]+|GGML_(AVX[A-Z0-9_]*|FMA|F16C|NATIVE)[^ ]*|/O[a-z0-9]+|ClangCL|OpenMP[^"]{0,40}|Build files have been|CMAKE_BUILD_TYPE[^ ]*|--config [A-Za-z]+' "$f" | sort | uniq -c | head -40
+        run: cargo build --release --example bench
       - name: Base
         working-directory: src-tauri
-        run: cargo run --release --example bench ${{ matrix.features }} -- --model base --lang en --runs 2
+        run: cargo run --release --example bench -- --model base --lang en --runs 2
+      - name: Large v3 Turbo
+        working-directory: src-tauri
+        run: cargo run --release --example bench -- --model large-v3-turbo-q5_0 --lang en --runs 1

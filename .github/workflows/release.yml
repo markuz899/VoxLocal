@@ -76,6 +76,16 @@ jobs:
           rm src-tauri/tauri.conf.json.bak
           grep -q "${GITHUB_REPOSITORY}" src-tauri/tauri.conf.json
 
+      # Con il generatore Visual Studio cmake-rs riscrive CMAKE_C_FLAGS_RELEASE senza /O2: whisper.cpp
+      # usciva non ottimizzato, ~10× più lento (bench su runner: turbo 175 s → 20 s per 11 s di audio).
+      # Definiti qui, cmake-rs non li tocca; -MD come il runtime di Rust.
+      - name: Ottimizzazioni MSVC
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          echo "CMAKE_C_FLAGS_RELEASE=-nologo -MD -O2 -Ob2 -DNDEBUG" >> "$GITHUB_ENV"
+          echo "CMAKE_CXX_FLAGS_RELEASE=-nologo -MD -O2 -Ob2 -DNDEBUG /utf-8" >> "$GITHUB_ENV"
+
       - name: Dipendenze Linux
         if: startsWith(matrix.platform, 'ubuntu')
         run: >

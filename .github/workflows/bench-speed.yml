@@ -1,6 +1,6 @@
 name: Bench velocità
 
-# Temporaneo: misura whisper sullo stesso tipo di macchina, Windows (MSVC) contro Linux (gcc).
+# Temporaneo: perché whisper su Windows (MSVC) è ~16× più lento che su Linux sullo stesso runner.
 on:
   push:
     branches: [bench/windows-speed]
@@ -10,33 +10,36 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [windows-latest, ubuntu-22.04]
-    runs-on: ${{ matrix.platform }}
+        include:
+          - name: msvc
+            features: ""
+            toolset: ""
+          - name: clangcl
+            features: ""
+            toolset: ClangCL
+          - name: msvc-openmp
+            features: --features whisper-rs/openmp
+            toolset: ""
+    name: windows ${{ matrix.name }}
+    runs-on: windows-latest
     env:
       GGML_NATIVE: "OFF"
     steps:
       - uses: actions/checkout@v4
-      - name: Dipendenze Linux
-        if: startsWith(matrix.platform, 'ubuntu')
-        run: >
-          sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev
-          libayatana-appindicator3-dev librsvg2-dev patchelf libasound2-dev libxdo-dev
-          libssl-dev cmake clang
       - uses: dtolnay/rust-toolchain@stable
-      - name: Processore
+      - name: Toolset
+        if: matrix.toolset != ''
         shell: bash
-        run: |
-          if [ "$RUNNER_OS" = Windows ]; then
-            powershell -c "Get-CimInstance Win32_Processor | Select Name,NumberOfCores,NumberOfLogicalProcessors | Format-List"
-          else
-            lscpu | grep -E 'Model name|^CPU\(s\)|Thread'
-          fi
+        run: echo "CMAKE_GENERATOR_TOOLSET=${{ matrix.toolset }}" >> "$GITHUB_ENV"
       - name: Build
         working-directory: src-tauri
-        run: cargo build --release --example bench
+        run: cargo build --release --example bench ${{ matrix.features }}
+      - name: Flag di compilazione di whisper.cpp
+        shell: bash
+        working-directory: src-tauri
+        run: |
+          f=$(ls target/release/build/whisper-rs-sys-*/output | head -1)
+          grep -oiE '/arch:[A-Z0-9]+|-march=[a-z0-9-]+|GGML_(AVX[A-Z0-9_]*|FMA|F16C|NATIVE)[^ ]*|/O[a-z0-9]+|ClangCL|OpenMP[^"]{0,40}|Build files have been|CMAKE_BUILD_TYPE[^ ]*|--config [A-Za-z]+' "$f" | sort | uniq -c | head -40
       - name: Base
         working-directory: src-tauri
-        run: cargo run --release --example bench -- --model base --lang en --runs 2
-      - name: Large v3 Turbo
-        working-directory: src-tauri
-        run: cargo run --release --example bench -- --model large-v3-turbo-q5_0 --lang en --runs 1
+        run: cargo run --release --example bench ${{ matrix.features }} -- --model base --lang en --runs 2

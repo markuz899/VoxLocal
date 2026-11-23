@@ -72,6 +72,7 @@ async fn main() -> Result<()> {
         whisper.set_min_ctx(m);
     }
     let load_ms = whisper.preload()?;
+    println!("{}", whisper_rs::print_system_info());
     println!("modello {model}  caricamento {load_ms} ms  run per file {runs}\n");
     println!(
         "{:<28} {:>7} {:>9} {:>8} {:>8} {:>6}  testo",

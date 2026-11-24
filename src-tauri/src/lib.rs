@@ -148,6 +148,7 @@ pub fn run() {
             commands::list_input_devices,
             commands::mic_test,
             commands::list_models,
+            commands::list_llm_models,
             commands::download_model,
             commands::delete_model,
             commands::list_providers,
@@ -227,43 +228,26 @@ pub fn run() {
                 pipeline.ensure_model();
             } else {
                 open_main(&handle, Some("onboarding"));
-                // Ollama come provider solo se è installato e acceso: senza, la pulizia fallirebbe
-                // a ogni dettato (e su un PC senza GPU sarebbe comunque lenta).
+                // Di serie il modello di pulizia incluso nell'app: si scarica insieme a Whisper.
                 if settings.default_llm == llm::registry::NONE_ID {
-                    let p = pipeline.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let tags = match llm::http()
-                            .get("http://localhost:11434/api/tags")
-                            .timeout(Duration::from_secs(2))
-                            .send()
-                            .await
-                        {
-                            Ok(r) if r.status().is_success() => r.text().await.ok(),
-                            _ => None,
-                        };
-                        if let Some(tags) = tags {
-                            let mut s = p.settings();
-                            // ponytail: basta il nome nella lista dei modelli, niente parsing del JSON
-                            s.default_llm = if tags.contains("\"voxclean") {
-                                llm::LOCAL_ID.into()
-                            } else {
-                                "ollama".into()
-                            };
-                            if let Err(e) = p.apply_settings(s) {
-                                log::warn!("provider Ollama non impostato: {e:#}");
-                            }
-                        }
-                    });
+                    let mut s = pipeline.settings();
+                    s.default_llm = llm::LOCAL_ID.into();
+                    match pipeline.apply_settings(s) {
+                        Ok(()) => pipeline.download_model(crate::models::LLM_RECOMMENDED),
+                        Err(e) => log::warn!("modello locale non impostato: {e:#}"),
+                    }
                 }
             }
 
             // Rilascia il modello whisper dopo `keep_warm_minutes` di inattività.
             let stt = pipeline.stt.clone();
+            let p = pipeline.clone();
             tauri::async_runtime::spawn(async move {
                 let mut tick = tokio::time::interval(Duration::from_secs(30));
                 loop {
                     tick.tick().await;
                     stt.release_if_idle();
+                    llm::local::release_if_idle(p.settings().keep_warm());
                 }
             });
             updater::spawn_background_checks(handle.clone());
@@ -274,6 +258,9 @@ pub fn run() {
         .expect("avvio di VoxLocal fallito");
 
     app.run(|_, event| {
+        if matches!(event, RunEvent::Exit) {
+            llm::local::shutdown();
+        }
         // App da barra di sistema: chiudere l'ultima finestra non deve terminarla.
         if let RunEvent::ExitRequested {
             api, code: None, ..

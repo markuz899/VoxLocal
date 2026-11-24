@@ -108,6 +108,18 @@ jobs:
           key: portable-cpu
       - run: pnpm install --frozen-lockfile
 
+      # Il motore del modello di pulizia locale (llama.cpp), incluso nell'app come sidecar.
+      # In cache: si ricompila solo quando cambia lo script (e con esso la versione di llama.cpp).
+      - uses: actions/cache@v4
+        with:
+          path: src-tauri/binaries
+          key: llama-server-${{ matrix.platform }}-${{ hashFiles('scripts/build-llama-server.sh') }}
+      - name: llama-server
+        shell: bash
+        run: |
+          triple=$([ "${{ matrix.platform }}" = macos-latest ] && echo universal-apple-darwin || rustc -vV | sed -n 's/^host: //p')
+          ls src-tauri/binaries/llama-server-"$triple"* 2>/dev/null || scripts/build-llama-server.sh "$triple"
+
       # Firma e notarizzazione Apple solo se i segreti esistono: senza, la build resta firmata
       # ad-hoc (installabile, ma macOS mostra l'avviso "sviluppatore non identificato").
       - name: Credenziali Apple

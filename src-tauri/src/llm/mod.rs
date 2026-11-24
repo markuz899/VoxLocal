@@ -3,12 +3,14 @@
 mod anthropic;
 mod cli;
 mod gemini;
+pub mod local;
 mod openai_compat;
 pub mod registry;
 
 pub use anthropic::Anthropic;
 pub use cli::CliProvider;
 pub use gemini::Gemini;
+pub use local::LocalLlm;
 pub use openai_compat::OpenAiCompatible;
 
 use std::sync::OnceLock;

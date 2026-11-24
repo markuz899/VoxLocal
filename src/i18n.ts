@@ -159,6 +159,10 @@ const en = {
   "providers.reachable": "Reachable in {ms}.",
   "providers.removeKey": "Remove the key",
   "providers.keyRemoved": "Key removed.",
+  "providers.localModels": "Free model on this computer",
+  "providers.localModelsHint":
+    "Trained by VoxLocal to clean up dictation in Italian. It runs offline, nothing leaves your computer.",
+  "providers.localMissing": "Download a model to use it.",
 
   // vocabulary
   "vocab.title": "Vocabulary",
@@ -578,6 +582,10 @@ const it: Record<Key, string> = {
   "providers.reachable": "Raggiungibile in {ms}.",
   "providers.removeKey": "Rimuovi chiave",
   "providers.keyRemoved": "Chiave rimossa.",
+  "providers.localModels": "Modello gratuito sul computer",
+  "providers.localModelsHint":
+    "Addestrato da VoxLocal per ripulire i dettati in italiano. Funziona senza internet: niente esce dal computer.",
+  "providers.localMissing": "Scarica un modello per usarlo.",
 
   "vocab.title": "Vocabolario",
   "vocab.description":

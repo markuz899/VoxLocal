@@ -27,6 +27,14 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
+      # Tauri vuole il sidecar llama-server anche solo per compilare: nei controlli basta un segnaposto
+      # (quello vero lo compila il workflow di rilascio, scripts/build-llama-server.sh).
+      - name: Sidecar segnaposto
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          ext=$([ "$RUNNER_OS" = Windows ] && echo .exe || true)
+          touch "src-tauri/binaries/llama-server-$(rustc -vV | sed -n 's/^host: //p')$ext"
       - run: pnpm format:check
       - run: pnpm test
       - run: pnpm build
@@ -52,6 +60,14 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
+      # Tauri vuole il sidecar llama-server anche solo per compilare: nei controlli basta un segnaposto
+      # (quello vero lo compila il workflow di rilascio, scripts/build-llama-server.sh).
+      - name: Sidecar segnaposto
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          ext=$([ "$RUNNER_OS" = Windows ] && echo .exe || true)
+          touch "src-tauri/binaries/llama-server-$(rustc -vV | sed -n 's/^host: //p')$ext"
       - run: pnpm build
       - working-directory: src-tauri
         run: cargo test --lib
@@ -76,6 +92,14 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: pnpm install --frozen-lockfile
+      # Tauri vuole il sidecar llama-server anche solo per compilare: nei controlli basta un segnaposto
+      # (quello vero lo compila il workflow di rilascio, scripts/build-llama-server.sh).
+      - name: Sidecar segnaposto
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          ext=$([ "$RUNNER_OS" = Windows ] && echo .exe || true)
+          touch "src-tauri/binaries/llama-server-$(rustc -vV | sed -n 's/^host: //p')$ext"
       - run: pnpm build
       - working-directory: src-tauri
         run: cargo check --all-targets

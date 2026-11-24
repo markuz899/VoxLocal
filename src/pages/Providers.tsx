@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { api, errorText, type ProviderView } from "../api";
+import {
+  api,
+  errorText,
+  events,
+  type ModelView,
+  type ProviderView,
+} from "../api";
 import { useSettings } from "../App";
-import { formatMs } from "../format";
+import { formatBytes, formatMs } from "../format";
 import { useT } from "../i18n";
 import {
   Button,
@@ -34,6 +40,7 @@ export default function Providers() {
   };
 
   const usable = providers.filter((p) => p.kind !== "none");
+  const local = providers.find((p) => p.kind === "local");
 
   return (
     <>
@@ -51,31 +58,149 @@ export default function Providers() {
           />
         </Row>
       </Group>
+      {local && <LocalModels provider={local} onChanged={reload} />}
       <Group title={t("providers.list")}>
-        {usable.map((p) =>
-          open === p.id ? (
-            <ProviderEditor
-              key={p.id}
-              provider={p}
-              onClose={() => setOpen(null)}
-              onSaved={reload}
-            />
-          ) : (
-            <Row
-              key={p.id}
-              label={p.label}
-              hint={
-                <span className={keyState(p).tone}>{keyState(p).text}</span>
-              }
-            >
-              <Button variant="ghost" onClick={() => setOpen(p.id)}>
-                {t("providers.configure")}
-              </Button>
-            </Row>
-          ),
-        )}
+        {usable
+          .filter((p) => p.kind !== "local")
+          .map((p) =>
+            open === p.id ? (
+              <ProviderEditor
+                key={p.id}
+                provider={p}
+                onClose={() => setOpen(null)}
+                onSaved={reload}
+              />
+            ) : (
+              <Row
+                key={p.id}
+                label={p.label}
+                hint={
+                  <span className={keyState(p).tone}>{keyState(p).text}</span>
+                }
+              >
+                <Button variant="ghost" onClick={() => setOpen(p.id)}>
+                  {t("providers.configure")}
+                </Button>
+              </Row>
+            ),
+          )}
       </Group>
     </>
+  );
+}
+
+/** Il modello di pulizia incluso nell'app: scelta tra i GGUF, download con avanzamento, eliminazione. */
+function LocalModels({
+  provider,
+  onChanged,
+}: {
+  provider: ProviderView;
+  onChanged: () => void;
+}) {
+  const t = useT();
+  const { settings } = useSettings();
+  const lang = settings.ui_language;
+  const [models, setModels] = useState<ModelView[]>([]);
+  const [progress, setProgress] = useState<Record<string, number>>({});
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = () => api.listLlmModels().then(setModels);
+  useEffect(() => {
+    refresh();
+    const offs = [
+      events.modelProgress((p) =>
+        setProgress((old) => ({ ...old, [p.id]: (p.done / p.total) * 100 })),
+      ),
+      events.modelDone((d) => {
+        setProgress(({ [d.id]: _done, ...rest }) => rest);
+        if (d.error) setError(d.error);
+        refresh();
+      }),
+    ];
+    return () => offs.forEach((p) => p.then((off) => off()));
+  }, []);
+
+  const run = async (f: () => Promise<unknown>) => {
+    setError(null);
+    try {
+      await f();
+    } catch (e) {
+      setError(errorText(e));
+    }
+    refresh();
+    onChanged();
+  };
+  const { has_key: _ignored, ...config } = provider;
+  const installed = models.some((m) => m.installed);
+
+  return (
+    <Group title={t("providers.localModels")}>
+      <Notice tone="error" text={error} />
+      <p className="px-4 pt-3 text-[12px] text-muted">
+        {t("providers.localModelsHint")}
+        {!installed && ` ${t("providers.localMissing")}`}
+      </p>
+      {models.map((m) => {
+        const inUse = m.id === provider.model;
+        const pct = progress[m.id];
+        return (
+          <Row
+            key={m.id}
+            label={
+              <span className={inUse ? "font-medium" : ""}>
+                {m.label}
+                {m.recommended && (
+                  <span className="ml-2 text-[12px] text-cobalt">
+                    {t("common.recommended")}
+                  </span>
+                )}
+              </span>
+            }
+            hint={
+              pct !== undefined
+                ? t("stt.downloading", { pct: Math.floor(pct) })
+                : `${formatBytes(m.size, lang)}${m.slow ? `. ${t("model.slowHere")}` : ""}`
+            }
+          >
+            {inUse && m.installed ? (
+              <span className="text-[12px] text-muted">
+                {t("common.inUse")}
+              </span>
+            ) : m.installed ? (
+              <>
+                <Button
+                  variant="ghost"
+                  onClick={() => run(() => api.deleteModel(m.id))}
+                >
+                  {t("common.delete")}
+                </Button>
+                <Button
+                  onClick={() =>
+                    run(() => api.saveProvider({ ...config, model: m.id }))
+                  }
+                >
+                  {t("common.use")}
+                </Button>
+              </>
+            ) : (
+              <Button
+                disabled={pct !== undefined}
+                onClick={() =>
+                  run(async () => {
+                    await api.downloadModel(m.id);
+                    setProgress((old) => ({ ...old, [m.id]: 0 }));
+                    if (!installed)
+                      await api.saveProvider({ ...config, model: m.id });
+                  })
+                }
+              >
+                {t("common.download")}
+              </Button>
+            )}
+          </Row>
+        );
+      })}
+    </Group>
   );
 }
 

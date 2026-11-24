@@ -18,6 +18,7 @@
   },
   "bundle": {
     "active": true,
+    "externalBin": ["binaries/llama-server"],
     "targets": [
       "app",
       "dmg",

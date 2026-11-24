@@ -37,10 +37,10 @@ impl LlmProvider for OpenAiCompatible {
                 { "role": "user", "content": req.user },
             ],
         });
-        if self.id == "ollama" || self.id == super::LOCAL_ID {
+        if self.id == "ollama" {
             // Per ripulire un dettato il ragionamento serve solo a rallentare; e con i modelli che Ollama vede come
-            // "ragionanti" (Qwen3, il modello di pulizia addestrato) la risposta finirebbe in `reasoning`, non in
-            // `content`. Sui modelli che non ragionano Ollama lo ignora.
+            // "ragionanti" (Qwen3) la risposta finirebbe in `reasoning`, non in `content`. Sui modelli che non
+            // ragionano Ollama lo ignora.
             body["reasoning_effort"] = json!("none");
         }
         if self.send_sampling {

@@ -37,6 +37,12 @@ impl LlmProvider for OpenAiCompatible {
                 { "role": "user", "content": req.user },
             ],
         });
+        if self.id == "ollama" {
+            // Per ripulire un dettato il ragionamento serve solo a rallentare; e con i modelli che Ollama vede come
+            // "ragionanti" (Qwen3, il modello di pulizia addestrato) la risposta finirebbe in `reasoning`, non in
+            // `content`. Sui modelli che non ragionano Ollama lo ignora.
+            body["reasoning_effort"] = json!("none");
+        }
         if self.send_sampling {
             body["max_tokens"] = json!(req.max_tokens);
             if let Some(t) = req.temperature {
@@ -127,6 +133,24 @@ mod tests {
             .mount(&server)
             .await;
         assert!(provider(&server, false).complete(&req()).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn ollama_turns_reasoning_off_others_do_not() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .respond_with(|r: &wiremock::Request| {
+                let b: Value = serde_json::from_slice(&r.body).unwrap();
+                let effort = b["reasoning_effort"].as_str().unwrap_or("-").to_string();
+                ResponseTemplate::new(200)
+                    .set_body_json(json!({"choices": [{"message": {"content": effort}}]}))
+            })
+            .mount(&server)
+            .await;
+        let mut p = provider(&server, true);
+        assert_eq!(p.complete(&req()).await.unwrap().text, "-");
+        p.id = "ollama".into();
+        assert_eq!(p.complete(&req()).await.unwrap().text, "none");
     }
 
     #[tokio::test]

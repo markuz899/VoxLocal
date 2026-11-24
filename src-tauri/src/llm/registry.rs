@@ -5,7 +5,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use super::{Anthropic, CliProvider, Gemini, LlmError, LlmProvider, OpenAiCompatible, Result};
+use super::{
+    Anthropic, CliProvider, Gemini, LlmError, LlmProvider, LocalLlm, OpenAiCompatible, Result,
+};
 use crate::settings::secrets;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -16,6 +18,8 @@ pub enum ProviderKind {
     Anthropic,
     Gemini,
     Cli,
+    /// Il modello di pulizia incluso nell'app (`llm::local`): GGUF scaricato + llama-server.
+    Local,
     /// Nessun post-processing: si incolla la trascrizione grezza.
     None,
 }
@@ -76,6 +80,14 @@ pub fn presets() -> Vec<ProviderConfig> {
             id: NONE_ID.into(),
             label: "Nessuno (testo grezzo)".into(),
             kind: ProviderKind::None,
+            ..Default::default()
+        },
+        // Il modello di pulizia addestrato per VoxLocal, scaricato e fatto girare dall'app stessa.
+        ProviderConfig {
+            id: super::LOCAL_ID.into(),
+            label: "VoxLocal (gratuito, sul computer)".into(),
+            kind: ProviderKind::Local,
+            model: crate::models::LLM_RECOMMENDED.into(),
             ..Default::default()
         },
         ProviderConfig {
@@ -250,6 +262,7 @@ pub fn build(cfg: &ProviderConfig) -> Result<Option<Arc<dyn LlmProvider>>> {
     }
     let p: Arc<dyn LlmProvider> = match cfg.kind {
         ProviderKind::None => return Ok(None),
+        ProviderKind::Local => Arc::new(LocalLlm { id: cfg.id.clone() }),
         ProviderKind::OpenaiCompat => Arc::new(OpenAiCompatible {
             id: cfg.id.clone(),
             base_url: cfg.base_url.clone(),

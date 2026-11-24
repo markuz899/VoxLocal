@@ -322,6 +322,19 @@ Su Windows (v0.2.1) large-v3-turbo ha impiegato 136 s per 4 s di audio: senza Me
 - **Ollama:** non è più il provider predefinito a scatola chiusa. Al primo avvio diventa predefinito solo se risponde su localhost:11434; altrimenti "nessuno" (restano le regole di D57).
 - **Prossimo passo:** GPU su Windows/Linux con il backend Vulkan di whisper.cpp, da provare su un PC vero.
 
+## D60 — Modello di pulizia incluso nell'app
+
+- **Decisione:** il modello di pulizia addestrato per VoxLocal (Qwen3 rifinito, `cleanup-model/`) è il provider
+  predefinito, "VoxLocal (gratuito, sul computer)". Il GGUF si scarica come i modelli di Whisper (SHA-256, ripresa)
+  da Hugging Face; lo fa girare `llama-server` di llama.cpp, incluso come sidecar e avviato dall'app quando serve.
+  Due taglie: 0,6B (di serie, 0,2 s sul Mac M1, 95% all'esame) e 1,7B (0,9 s, 97%).
+- **Perché un processo separato:** whisper-rs e llama.cpp portano ciascuno la propria copia di ggml, che nello stesso
+  eseguibile andrebbero in conflitto; inoltre se il server cade l'app resta in piedi. Niente Ollama: l'utente non
+  deve installare nulla.
+- **Formato:** il modello non legge istruzioni. Riceve `<mode>…</mode><lang>it</lang>[<vocab>…</vocab>]` più il
+  dettato nel template di Qwen3 senza ragionamento, identico all'addestramento. Le modalità che non conosce
+  (traduzione, personalizzate, riunioni) vanno assegnate a un altro provider.
+
 ## Rischi principali (in ordine)
 
 1. **Push-to-talk e Released:** su Windows, se l'utente rilascia prima il modificatore e poi il tasto, `RegisterHotKey` non genera sempre l'evento Released. *Mitigazione:* tetto di durata più il fatto che una seconda pressione chiude comunque. Se non basta, si passa a un hook di tastiera di basso livello (`rdev`) solo su Windows.

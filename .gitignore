@@ -6,3 +6,4 @@ site/.taste-skill
 site/shots
 site/downloads
 .DS_Store
+src-tauri/binaries

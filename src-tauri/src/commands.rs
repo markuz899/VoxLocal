@@ -74,19 +74,37 @@ pub fn list_models() -> Vec<ModelView> {
         .collect()
 }
 
+/// I modelli di pulizia locali, per la scheda Provider LLM.
+#[tauri::command]
+pub fn list_llm_models() -> Vec<ModelView> {
+    models::LLM_MODELS
+        .iter()
+        .map(|m| ModelView {
+            id: m.id,
+            label: m.label,
+            size: m.size,
+            installed: models::is_installed(m),
+            recommended: m.id == models::LLM_RECOMMENDED,
+            // ponytail: misurato solo sul Mac M1 (0,9 s); sui PC senza GPU l'1,7B va provato
+            slow: m.id != models::LLM_RECOMMENDED
+                && !cfg!(all(target_os = "macos", target_arch = "aarch64")),
+        })
+        .collect()
+}
+
 #[tauri::command]
 pub fn download_model(p: P, id: String) -> R<()> {
-    if p.is_downloading() {
-        return Err("c'è già un download in corso".into());
-    }
-    p.download_model(&id);
+    p.download_model(&id); // se un altro download è in corso, questo aspetta il suo turno
     Ok(())
 }
 
 #[tauri::command]
 pub fn delete_model(p: P, id: String) -> R<()> {
     let info = models::find(&id).ok_or("modello sconosciuto")?;
-    if p.settings().local_model == id {
+    let s = p.settings();
+    let llm_in_use =
+        crate::llm::registry::find(crate::llm::LOCAL_ID, &s.providers).map(|c| c.model);
+    if s.local_model == id || llm_in_use.as_deref() == Some(id.as_str()) {
         return Err("è il modello in uso: scegline un altro prima di eliminarlo".into());
     }
     std::fs::remove_file(models::path(info)).map_err(err)

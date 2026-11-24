@@ -67,6 +67,7 @@ Requisiti: Rust stabile, Node 22 (`.nvmrc`), pnpm, cmake. Su macOS servono Xcode
 
 ```sh
 pnpm install
+scripts/build-llama-server.sh  # una volta: il motore del modello di pulizia locale (llama.cpp)
 pnpm tauri dev                 # build commerciale
 pnpm dev:personal              # con i provider in abbonamento Claude Code / Codex (solo uso personale)
 

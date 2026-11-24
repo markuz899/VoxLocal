@@ -1,4 +1,5 @@
-//! Modelli ggml di whisper.cpp: manifest con SHA-256, download riprendibile e verificato.
+//! Modelli scaricabili: ggml di whisper.cpp e GGUF del modello di pulizia locale.
+//! Manifest con SHA-256, download riprendibile e verificato.
 
 use std::path::PathBuf;
 
@@ -8,9 +9,11 @@ use sha2::{Digest, Sha256};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 const BASE_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main";
+const LLM_URL: &str = "https://huggingface.co/markuz89/voxclean/resolve/main";
 
 pub struct ModelInfo {
     pub id: &'static str,
+    pub base: &'static str,
     pub label: &'static str,
     pub file: &'static str,
     pub size: u64,
@@ -93,6 +96,7 @@ const fn m(
 ) -> ModelInfo {
     ModelInfo {
         id,
+        base: BASE_URL,
         label,
         file,
         size,
@@ -100,8 +104,34 @@ const fn m(
     }
 }
 
+/// Modelli di pulizia addestrati per VoxLocal (cleanup-model/), Qwen3 rifinito, licenza Apache 2.0.
+/// Hash e dimensioni dei file pubblicati.
+pub const LLM_MODELS: &[ModelInfo] = &[
+    ModelInfo {
+        id: "voxclean-0.6b",
+        base: LLM_URL,
+        label: "Veloce (0,6B)",
+        file: "voxclean-0.6b-q4_k_m.gguf",
+        size: 396704576,
+        sha256: "5651bbfb95621b887e2927e36df63ddd4d5e6ba1a6bbaf3781ed207ad55af408",
+    },
+    ModelInfo {
+        id: "voxclean-1.7b",
+        base: LLM_URL,
+        label: "Preciso (1,7B)",
+        file: "voxclean-1.7b-q4_k_m.gguf",
+        size: 1107408704,
+        sha256: "dd70d3d4cc1d4b5bb377eaacd9d539794b74bef3962b2b972ffd4c48d2edaa9a",
+    },
+];
+
+/// Il modello di pulizia proposto di serie: sul Mac M1 lo 0,6B risponde in 0,2 s, l'1,7B in 0,9 s
+/// (95% contro 97% all'esame, cleanup-model/PIANO.md).
+pub const LLM_RECOMMENDED: &str = "voxclean-0.6b";
+
+/// Cerca sia tra i modelli di Whisper sia tra quelli di pulizia (stesso download, stessa cartella).
 pub fn find(id: &str) -> Option<&'static ModelInfo> {
-    MODELS.iter().find(|m| m.id == id)
+    MODELS.iter().chain(LLM_MODELS).find(|m| m.id == id)
 }
 
 /// Default suggerito per l'hardware (DECISIONS D27). Su M1 8 GB, con flash attention e
@@ -144,7 +174,9 @@ pub async fn download(m: &ModelInfo, mut progress: impl FnMut(u64, u64)) -> Resu
         return Ok(dest);
     }
     tokio::fs::create_dir_all(models_dir()).await?;
-    let part = dest.with_extension("bin.part");
+    let mut part = dest.clone().into_os_string();
+    part.push(".part"); // "ggml-base.bin.part", "voxclean-0.6b-q4_k_m.gguf.part"
+    let part = PathBuf::from(part);
 
     let mut hasher = Sha256::new();
     let mut have = 0u64;
@@ -163,7 +195,7 @@ pub async fn download(m: &ModelInfo, mut progress: impl FnMut(u64, u64)) -> Resu
     let client = reqwest::Client::builder()
         .connect_timeout(std::time::Duration::from_secs(10))
         .build()?;
-    let mut req = client.get(format!("{BASE_URL}/{}", m.file));
+    let mut req = client.get(format!("{}/{}", m.base, m.file));
     if have > 0 {
         req = req.header(reqwest::header::RANGE, format!("bytes={have}-"));
     }

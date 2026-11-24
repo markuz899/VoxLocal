@@ -141,7 +141,7 @@ export interface AppMode {
 }
 
 export type ProviderKind =
-  "openai_compat" | "anthropic" | "gemini" | "cli" | "none";
+  "openai_compat" | "anthropic" | "gemini" | "cli" | "local" | "none";
 
 export interface ProviderConfig {
   id: string;
@@ -251,6 +251,7 @@ export const api = {
   listInputDevices: () => invoke<string[]>("list_input_devices"),
   micTest: (on: boolean) => invoke<void>("mic_test", { on }),
   listModels: () => invoke<ModelView[]>("list_models"),
+  listLlmModels: () => invoke<ModelView[]>("list_llm_models"),
   downloadModel: (id: string) => invoke<void>("download_model", { id }),
   deleteModel: (id: string) => invoke<void>("delete_model", { id }),
   listProviders: () => invoke<ProviderView[]>("list_providers"),

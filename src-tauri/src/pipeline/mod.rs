@@ -100,6 +100,10 @@ struct StateEvent {
     app: Option<String>,
 }
 
+/// Download dei modelli: id in coda o in corso, e il turno (uno alla volta).
+static DOWNLOADS: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
+static DOWNLOAD_TURN: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 pub struct Pipeline {
     app: AppHandle,
     pub stt: LocalWhisper,
@@ -310,6 +314,16 @@ impl Pipeline {
                     log::error!("{e:#}");
                 }
             });
+        }
+        // Stesso discorso per il modello di pulizia locale: il primo avvio di llama-server dopo
+        // l'installazione richiede ~17 s (Metal prepara gli shader), i successivi ~0,6 s.
+        {
+            let s = self.settings.lock().unwrap();
+            if s.default_llm == llm::LOCAL_ID {
+                if let Some(cfg) = registry::find(llm::LOCAL_ID, &s.providers) {
+                    llm::local::warm(&cfg.model);
+                }
+            }
         }
 
         let app = self.app.clone();
@@ -1071,18 +1085,34 @@ impl Pipeline {
         } else {
             s.llm_timeout_s
         };
+        let local = cfg.id == llm::LOCAL_ID;
+        let (system, user) = if local {
+            let user = llm::local_prompt(&mode.slug, language, vocabulary, text).ok_or_else(|| {
+                LlmError::Cli(format!(
+                    "il modello locale non gestisce la modalità «{}»: scegli un altro modello per questa modalità",
+                    mode.name
+                ))
+            })?;
+            (String::new(), user)
+        } else {
+            (
+                llm::render(
+                    &mode
+                        .system_prompt
+                        .replace("{{target_language}}", language_name(&s.translate_to)),
+                    text,
+                    language,
+                    vocabulary,
+                ),
+                llm::render(&mode.user_template, text, language, vocabulary),
+            )
+        };
         let req = LlmRequest {
-            system: llm::render(
-                &mode
-                    .system_prompt
-                    .replace("{{target_language}}", language_name(&s.translate_to)),
-                text,
-                language,
-                vocabulary,
-            ),
-            user: llm::render(&mode.user_template, text, language, vocabulary),
+            system,
+            user,
             model: model.clone(),
-            temperature: Some(mode.temperature),
+            // il modello locale è addestrato per rispondere sempre allo stesso modo
+            temperature: Some(if local { 0.0 } else { mode.temperature }),
             max_tokens: 2048,
             // Un riassunto di una registrazione lunga richiede più tempo di un dettato.
             timeout: Duration::from_secs(if matches!(mode.slug.as_str(), "summary" | "ask") {
@@ -1148,11 +1178,15 @@ impl Pipeline {
         }
     }
 
-    /// Scarica il modello configurato se manca (una sola volta per volta).
-    /// Scarica il modello configurato se manca.
+    /// Scarica i modelli configurati se mancano: Whisper e, se è il provider predefinito, quello di pulizia.
     pub fn ensure_model(self: &Arc<Self>) {
-        let id = self.settings.lock().unwrap().local_model.clone();
-        self.download_model(&id);
+        let s = self.settings();
+        self.download_model(&s.local_model);
+        if s.default_llm == llm::LOCAL_ID {
+            if let Some(cfg) = registry::find(llm::LOCAL_ID, &s.providers) {
+                self.download_model(&cfg.model);
+            }
+        }
     }
 
     /// Scarica un modello (uno alla volta). Eventi: `models://progress` e `models://done`.
@@ -1529,10 +1563,11 @@ impl Pipeline {
         let label = cfg.as_ref().map(|c| c.label.clone()).unwrap_or_default();
         let kind = cfg.as_ref().map(|c| c.kind).unwrap_or(ProviderKind::None);
         let local = cfg.as_ref().is_some_and(|c| {
-            c.kind == ProviderKind::OpenaiCompat
-                && ["localhost", "127.0.0.1", "[::1]"]
-                    .iter()
-                    .any(|h| c.base_url.contains(h))
+            c.kind == ProviderKind::Local
+                || c.kind == ProviderKind::OpenaiCompat
+                    && ["localhost", "127.0.0.1", "[::1]"]
+                        .iter()
+                        .any(|h| c.base_url.contains(h))
         });
         AskTarget {
             label,
@@ -1700,16 +1735,28 @@ impl Pipeline {
         Ok(out)
     }
 
+    /// Scarica un modello (Whisper o di pulizia); se un altro è in corso, si mette in coda.
+    /// Eventi: `models://progress` e `models://done`.
     pub fn download_model(self: &Arc<Self>, id: &str) {
         let Some(info) = models::find(id) else {
             return;
         };
-        if models::is_installed(info) || self.downloading.swap(true, Ordering::SeqCst) {
+        if models::is_installed(info) {
             return;
         }
+        {
+            let mut queued = DOWNLOADS.lock().unwrap();
+            if queued.contains(&info.id) {
+                return;
+            }
+            queued.push(info.id);
+        }
+        self.downloading.store(true, Ordering::SeqCst);
         let me = self.clone();
         let lang = self.lang();
         tauri::async_runtime::spawn(async move {
+            // uno alla volta: Whisper e il modello di pulizia possono essere chiesti insieme al primo avvio
+            let _turn = DOWNLOAD_TURN.lock().await;
             let app = me.app.clone();
             let mut last = u64::MAX;
             let res = models::download(info, |done, total| {
@@ -1735,7 +1782,11 @@ impl Pipeline {
                 }
             })
             .await;
-            me.downloading.store(false, Ordering::SeqCst);
+            {
+                let mut queued = DOWNLOADS.lock().unwrap();
+                queued.retain(|id| *id != info.id);
+                me.downloading.store(!queued.is_empty(), Ordering::SeqCst);
+            }
             let error = res.as_ref().err().map(|e| format!("{e:#}"));
             let _ = me.app.emit(
                 "models://done",

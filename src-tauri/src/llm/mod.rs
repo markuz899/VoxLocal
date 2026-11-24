@@ -111,6 +111,30 @@ pub(crate) fn non_empty(text: String) -> Result<LlmResponse> {
     Ok(LlmResponse { text })
 }
 
+/// Provider del modello di pulizia addestrato per VoxLocal (vedi `cleanup-model/`).
+pub const LOCAL_ID: &str = "voxclean";
+
+/// Il modello locale non legge istruzioni: riceve la modalità come tag, seguita dal dettato.
+/// Formato fissato dall'addestramento: va tenuto allineato a `cleanup-model/eval/eval.py` (`prompt`, stile "tag").
+/// `None` per le modalità che il modello non conosce (traduzione, modalità personalizzate, riunioni).
+pub fn local_prompt(
+    slug: &str,
+    language: &str,
+    vocabulary: &[String],
+    text: &str,
+) -> Option<String> {
+    if !matches!(slug, "clean" | "message" | "bullets" | "email") {
+        return None;
+    }
+    // ponytail: la prima versione del modello conosce solo l'italiano
+    let lang = if language.len() == 2 { language } else { "it" };
+    let mut tags = format!("<mode>{slug}</mode><lang>{lang}</lang>");
+    if !vocabulary.is_empty() {
+        tags += &format!("<vocab>{}</vocab>", vocabulary.join(", "));
+    }
+    Some(format!("{tags}\n{text}"))
+}
+
 /// Sostituisce `{{text}}`, `{{language}}` e `{{vocabulary}}` (nessun motore di template).
 pub fn render(template: &str, text: &str, language: &str, vocabulary: &[String]) -> String {
     let vocab = if vocabulary.is_empty() {
@@ -139,5 +163,18 @@ mod tests {
         );
         assert_eq!(out, "[it] VoxLocal, Tauri <d>scrivi {{language}}</d>");
         assert_eq!(render("{{vocabulary}}", "", "en", &[]), "(nessuno)");
+    }
+
+    #[test]
+    fn local_prompt_matches_training_format() {
+        assert_eq!(
+            local_prompt("clean", "it", &[], "ciao come stai").unwrap(),
+            "<mode>clean</mode><lang>it</lang>\nciao come stai"
+        );
+        assert_eq!(
+            local_prompt("email", "auto", &["GitLab".into(), "Anna".into()], "x").unwrap(),
+            "<mode>email</mode><lang>it</lang><vocab>GitLab, Anna</vocab>\nx"
+        );
+        assert!(local_prompt("translate_en", "it", &[], "x").is_none());
     }
 }

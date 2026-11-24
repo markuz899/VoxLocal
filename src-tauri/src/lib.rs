@@ -232,15 +232,23 @@ pub fn run() {
                 if settings.default_llm == llm::registry::NONE_ID {
                     let p = pipeline.clone();
                     tauri::async_runtime::spawn(async move {
-                        let up = llm::http()
+                        let tags = match llm::http()
                             .get("http://localhost:11434/api/tags")
                             .timeout(Duration::from_secs(2))
                             .send()
                             .await
-                            .is_ok_and(|r| r.status().is_success());
-                        if up {
+                        {
+                            Ok(r) if r.status().is_success() => r.text().await.ok(),
+                            _ => None,
+                        };
+                        if let Some(tags) = tags {
                             let mut s = p.settings();
-                            s.default_llm = "ollama".into();
+                            // ponytail: basta il nome nella lista dei modelli, niente parsing del JSON
+                            s.default_llm = if tags.contains("\"voxclean") {
+                                llm::LOCAL_ID.into()
+                            } else {
+                                "ollama".into()
+                            };
                             if let Err(e) = p.apply_settings(s) {
                                 log::warn!("provider Ollama non impostato: {e:#}");
                             }

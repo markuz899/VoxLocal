@@ -78,6 +78,15 @@ pub fn presets() -> Vec<ProviderConfig> {
             kind: ProviderKind::None,
             ..Default::default()
         },
+        // Il modello di pulizia addestrato per VoxLocal. Per ora gira in Ollama (`ollama create voxclean`);
+        // quando sarà incluso nell'app questo provider resterà con lo stesso id.
+        oa(
+            super::LOCAL_ID,
+            "VoxLocal (locale)",
+            "http://localhost:11434/v1",
+            "voxclean",
+            false,
+        ),
         ProviderConfig {
             send_sampling: false,
             stt_model: Some("gpt-4o-mini-transcribe".into()),

@@ -1071,18 +1071,34 @@ impl Pipeline {
         } else {
             s.llm_timeout_s
         };
+        let local = cfg.id == llm::LOCAL_ID;
+        let (system, user) = if local {
+            let user = llm::local_prompt(&mode.slug, language, vocabulary, text).ok_or_else(|| {
+                LlmError::Cli(format!(
+                    "il modello locale non gestisce la modalità «{}»: scegli un altro modello per questa modalità",
+                    mode.name
+                ))
+            })?;
+            (String::new(), user)
+        } else {
+            (
+                llm::render(
+                    &mode
+                        .system_prompt
+                        .replace("{{target_language}}", language_name(&s.translate_to)),
+                    text,
+                    language,
+                    vocabulary,
+                ),
+                llm::render(&mode.user_template, text, language, vocabulary),
+            )
+        };
         let req = LlmRequest {
-            system: llm::render(
-                &mode
-                    .system_prompt
-                    .replace("{{target_language}}", language_name(&s.translate_to)),
-                text,
-                language,
-                vocabulary,
-            ),
-            user: llm::render(&mode.user_template, text, language, vocabulary),
+            system,
+            user,
             model: model.clone(),
-            temperature: Some(mode.temperature),
+            // il modello locale è addestrato per rispondere sempre allo stesso modo
+            temperature: Some(if local { 0.0 } else { mode.temperature }),
             max_tokens: 2048,
             // Un riassunto di una registrazione lunga richiede più tempo di un dettato.
             timeout: Duration::from_secs(if matches!(mode.slug.as_str(), "summary" | "ask") {

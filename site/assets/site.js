@@ -159,6 +159,9 @@ function floatingDictations() {
   async function spawn() {
     const free = slots.map((_, i) => i).filter((i) => !busy.has(i));
     if (!free.length || document.hidden) return;
+    // only where the card fits beside the headline (a narrow window would lay it over the words)
+    const words = document.querySelector('.hero__lead');
+    if (!words || (box.clientWidth - words.offsetWidth) / 2 < 240) return;
     const si = free[Math.floor(Math.random() * free.length)];
     busy.add(si);
     const [side, top] = slots[si];

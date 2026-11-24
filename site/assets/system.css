@@ -244,7 +244,9 @@ main > :is(section, .section).g2 > :is(.wrap, .container) > :is(.group, .fill) {
   main > :is(section, .section).g2 > .wrap > .group > .grid:last-child { align-self: stretch; flex: 1 1 auto; min-height: 0; }
 }
 .group > .fill { flex: 1 1 0; min-height: 0; }
-@media (min-width: 640px) and (max-width: 1279px) {
+/* on a desktop too: content taller than the screen (a 1366x768 laptop, a long FAQ) grows the section
+   instead of lying over the next one */
+@media (min-width: 640px) {
   main > :is(section, .section):not(.hero, .section--hero), footer.closing {
     height: auto; min-height: calc(var(--h, 1) * 100vh); min-height: calc(var(--h, 1) * 100svh);
   }
